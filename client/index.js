@@ -16,8 +16,9 @@ class Scene{
 		'attribute vec4 a_Normal;\n' +        // Normal
 		'uniform mat4 u_ModelMatrix;\n' +
 		'uniform mat4 u_NormalMatrix;\n' +
-		'uniform mat4 u_ViewMatrix;\n' +
-		'uniform mat4 u_ProjMatrix;\n' +
+		// 'uniform mat4 u_ViewMatrix;\n' +
+		'uniform mat4 u_MVPMatrix;\n' + 
+		// 'uniform mat4 u_ProjMatrix;\n' +
 		'uniform vec3 u_LightColor;\n' +     // Light color
 		'uniform vec3 u_LightPosition;\n' + // Light direction (in the world coordinate, normalized)
 		"uniform vec3 u_AmbientLight;\n" +
@@ -26,10 +27,12 @@ class Scene{
 		"varying vec3 v_Position;\n" +
 		'uniform bool u_isLighting;\n' +
 		'void main() {\n' +
-		'  gl_Position = u_ProjMatrix * u_ViewMatrix * u_ModelMatrix * a_Position;\n' +
+		// '  gl_Position = u_ProjMatrix * u_ViewMatrix * u_ModelMatrix * a_Position;\n' +
+		'  gl_Position = u_MVPMatrix * u_ModelMatrix * a_Position;\n' +
 		'  if(u_isLighting)\n' + 
 		'  {\n' +
 		"	v_Position = vec3(u_ModelMatrix * a_Position);\n"+
+		
 		"	v_Normal = normalize(vec3(u_NormalMatrix * a_Normal));\n"+
 		' 	v_Color = a_Color;\n' +'  }\n' +
 		'  else\n' +
@@ -114,6 +117,7 @@ class Scene{
 		this.program = this.gl.program;
 		this.viewMatrix = new Matrix4();  // The view matrix
 		this.projMatrix = new Matrix4();  // The projection matrix
+		this.mvpMatrix = new Matrix4();
 		this.models = [];
 		// Set clear color to white and enable hidden surface removal
 		this.gl.clearColor(1.0, 1.0, 1.0, 1.0);
@@ -124,14 +128,12 @@ class Scene{
 
 		// Get the storage locations of uniform attributes
 		
-		// var u_ModelMatrix = this.gl.getUniformLocation(this.gl.program, 'u_ModelMatrix');
 		this.program.a_Position = this.gl.getAttribLocation(this.program, 'a_Position');
 		this.program.a_Normal = this.gl.getAttribLocation(this.program, 'a_Normal');
 		this.program.a_Color = this.gl.getAttribLocation(this.program, 'a_Color');
-		this.program.u_ViewMatrix = this.gl.getUniformLocation(this.program, 'u_ViewMatrix');
 		this.program.u_ModelMatrix = this.gl.getUniformLocation(this.program, 'u_ModelMatrix');
 		this.program.u_NormalMatrix = this.gl.getUniformLocation(this.program,"u_NormalMatrix");
-		this.program.u_ProjMatrix = this.gl.getUniformLocation(this.program, 'u_ProjMatrix');
+		this.program.u_MVPMatrix = this.gl.getUniformLocation(this.program,"u_MVPMatrix");
 		this.program.u_LightColor = this.gl.getUniformLocation(this.program, 'u_LightColor');
 		this.program.u_LightPosition = this.gl.getUniformLocation(this.program, 'u_LightPosition');
 		this.program.u_AmbientLight = this.gl.getUniformLocation(this.program, 'u_AmbientLight');
@@ -139,7 +141,7 @@ class Scene{
 		// Trigger using lighting or not
 		this.program.u_isLighting = this.gl.getUniformLocation(this.gl.program, 'u_isLighting'); 
 
-		if (!this.program.u_ViewMatrix || !this.program.u_LightPosition || !this.program.u_ProjMatrix ) { 
+		if (!this.program.u_MVPMatrix || !this.program.u_LightPosition ) { 
 			console.log('Failed to Get the storage locations of u_ViewMatrix, and/or u_ProjMatrix');
 			return;
 		}
@@ -148,7 +150,7 @@ class Scene{
 		this.gl.uniform3f(this.program.u_LightColor, 1, 1, 1);
 		// this.gl.uniform3f(this.program.u_AmbientLight, 0.2, 0.2, 0.2);
 		this.gl.uniform3f(this.program.u_AmbientLight,0.01, 0.01, 0.01);
-		this.gl.uniform3f(this.program.u_LightPosition, 0, 10, 0);
+		this.gl.uniform3f(this.program.u_LightPosition, 0, 8.5, 0);
 
 		// Calculate the view matrix and the projection matrix
 
@@ -157,9 +159,14 @@ class Scene{
 		this.viewMatrix.setLookAt(this.eye.x, this.eye.y, this.eye.z, 0, 0, 0, 0, 1.0, 0.0);
 		this.projMatrix.setPerspective(90, this.canvas.width/this.canvas.height, 1, 100);
 
+		this.mvpMatrix.set(this.projMatrix).multiply(this.viewMatrix);
+
 		// Pass the model, view, and projection matrix to the uniform variable respectively
-		this.gl.uniformMatrix4fv(this.program.u_ViewMatrix, false, this.viewMatrix.elements);
-		this.gl.uniformMatrix4fv(this.program.u_ProjMatrix, false, this.projMatrix.elements);
+		// this.gl.uniformMatrix4fv(this.program.u_ViewMatrix, false, this.viewMatrix.elements);
+		// this.gl.uniformMatrix4fv(this.program.u_ProjMatrix, false, this.projMatrix.elements);
+		this.gl.uniformMatrix4fv(this.program.u_MVPMatrix, false, this.mvpMatrix.elements);
+
+
 
 		this.gl.uniform1i(this.program.u_isLighting, true); // Will apply lighting
 		this.depth = -20;
@@ -251,7 +258,13 @@ class Scene{
 		mat4.rotateX(this.viewMatrix.elements,this.viewMatrix.elements, this.eye.x);
 		mat4.rotateY(this.viewMatrix.elements,this.viewMatrix.elements, this.eye.y);
 
-		this.gl.uniformMatrix4fv(this.program.u_ViewMatrix, false, this.viewMatrix.elements);
+		// this.gl.uniformMatrix4fv(this.program.u_ViewMatrix, false, this.viewMatrix.elements);
+
+		this.mvpMatrix.set(this.projMatrix).multiply(this.viewMatrix);
+
+		// Pass the model, view, and projection matrix to the uniform variable respectively
+		this.gl.uniformMatrix4fv(this.program.u_MVPMatrix, false, this.mvpMatrix.elements);
+
 	}
 }
 
@@ -339,11 +352,9 @@ class Model {
 	}
 	updateRot(rot){
 		if (rot){
-			printMatrix(this.modelMatrix,this.name);
 			this.modelMatrix.rotate(rot.elements[1],0,1,0);
 			this.modelMatrix.rotate(rot.elements[0],1,0,0);
 			this.modelMatrix.rotate(rot.elements[2],0,0,1);
-			printMatrix(this.modelMatrix,this.name);
 		}
 		this.updateChildren();
 	}
@@ -485,7 +496,9 @@ class Model {
 	
 }
 
-//#region obj importq
+//#region obj importing
+
+
 
 function readOBJFile(fileName, gl,program, model, scale, reverse){
 
@@ -739,6 +752,22 @@ class objDoc{
 
 //#endregion obj import
 
+class Texture{
+	constructor(name){
+		this.name = name;
+		this.loaded = false
+	}
+	requestTexture(){
+		var request = new XMLHttpRequest();
+		request.onreadystatechange = function (){
+			if (request.readyState === 4 && request.status !== 404) {
+				console.log(request.response);
+			}
+		}
+		request.open("GET",this.name,true);
+		request.send();
+	}
+}
 //#region basic classes and common function
 class Vertex{
 	constructor(x,y,z){
@@ -825,6 +854,8 @@ function update(){
 	window.requestAnimationFrame(update);
 }
 
+
+
 function printMatrix(mat,name){
 	if (name){
 		console.log("--------------Start  "+name+"--------------")
@@ -890,31 +921,56 @@ function main() {
 	
 	let mug = Scene1.newModel("mug",0);
 	mug.updateScale(new Vector3([0.6,0.6,0.6]))
-	mug.updatePos(new Vector3([2,-1.2,-3.5]))
+	mug.updatePos(new Vector3([0,-1.2,-3.5]))
+	var plate = Scene1.newModel("plate",0)
+	plate.updateScale(new Vector3([1.1,1.1,1.1]));
+	plate.updatePos(new Vector3([0.8,-0.5,0]))
+
+	tableParent.addChild(plate)
+	tableParent.addChild(mug);
 	//#endregion Table
 
 	var floor = Scene1.newModel("quad",0);
 	floor.updatePos(new Vector3([0,-3,0]))
 	floor.updateScale(new Vector3([10,1,10]))
 
+	//#region sofas
+
 	var sofa1 = Scene1.newModel("sofa1",0);
-	sofa1.updatePos(new Vector3([8.9,-2.5,1.5]))
+	sofa1.updatePos(new Vector3([8.9,-2.5,1.2]))
 
-	var plateParent = Scene1.newModel("plateParent",2)
-	var plateBase = Scene1.newModel("plateBase",1);
-	plateBase.updateScale(new Vector3([0.8,0.1,0.8]))
-	plateParent.addChild(plateBase);
+	var sofa2 = Scene1.newModel("sofa2",0);
+	sofa2.updatePos(new Vector3([5,-2.5,9.5]))
+	sofa2.updateRot(new Vector3([0,-30,0]))
+	sofa2.updatePos(new Vector3([1.2,0,0]))
 
-	var side1 = Scene1.newModel("side1",1);
-	// var side2 = Scene1.newModel("side2",1);
-	// var side3 = Scene1.newModel("side3",1);
-	// var side4 = Scene1.newModel("side4",1);
-	side1.updatePos(new Vector3([0.8,0.05,0]));
-	side1.updateRot(new Vector3([0,0,50]))
-	side1.updateScale(new Vector3([0.15,0.15,0.8]));
-	
+	var sofa3 = Scene1.newModel("sofa2",0);
+	sofa3.updatePos(new Vector3([6,-2.5,-5]))
+	sofa3.updateRot(new Vector3([0,30,0]))
+	sofa3.updatePos(new Vector3([2.5,0,1]))
+
+	//#endregion sofas
+
+	// sort scaling/ position after fixing tv stand
+	var TVStand = Scene1.newModel("TV_Stand",0)
+	TVStand.updatePos(new Vector3([-8,-1.6,3]))
+	TVStand.updateScale(new Vector3([1,0.7,1.5]))
+
+	var TV = Scene1.newModel("TV",0)
+	TV.updatePos(new Vector3([-8,4,0]))
+
+	var soundbar = Scene1.newModel("Soundbar",0)
+	soundbar.updatePos(new Vector3([-8,1,0]))
 
 
+
+	var bulb = Scene1.newModel("bulb",0)
+	bulb.updatePos(new Vector3([0,10,0]))
+	bulb.updateRot(new Vector3([180,0,0]))
+	bulb.updateScale(new Vector3([0.5,0.5,0.5]))
+
+
+	var text = new Texture("sofa");
 	document.onkeydown = function(ev){
 		keypressed[ev.keyCode] = true;
 
@@ -922,11 +978,6 @@ function main() {
 	document.onkeyup = function(ev){
 		keypressed[ev.keyCode] = false;
 	};
-
-
-
-
 	window.requestAnimationFrame(update);
-
 }
 
