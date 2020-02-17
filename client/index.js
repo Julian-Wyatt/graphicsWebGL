@@ -4,6 +4,8 @@ class Scene{
 	constructor(gl,canvas){
 		this.gl = gl;
 		this.canvas = canvas;
+
+		//#region shaders
 		// point light per fragment
 		var VSHADER_SOURCE =
 		'#ifdef GL_ES\n' +
@@ -106,6 +108,9 @@ class Scene{
 			console.log('Failed to intialize shaders.');
 			return;
 		}
+
+		//#endregion shaders
+		
 		this.program = this.gl.program;
 		this.viewMatrix = new Matrix4();  // The view matrix
 		this.projMatrix = new Matrix4();  // The projection matrix
@@ -141,8 +146,9 @@ class Scene{
 
 		// Set the light color (white)
 		this.gl.uniform3f(this.program.u_LightColor, 1, 1, 1);
-		this.gl.uniform3f(this.program.u_AmbientLight, 0.2, 0.2, 0.2);
-		this.gl.uniform3f(this.program.u_LightPosition, -2, -2, -2);
+		// this.gl.uniform3f(this.program.u_AmbientLight, 0.2, 0.2, 0.2);
+		this.gl.uniform3f(this.program.u_AmbientLight,0.01, 0.01, 0.01);
+		this.gl.uniform3f(this.program.u_LightPosition, 0, 10, 0);
 
 		// Calculate the view matrix and the projection matrix
 
@@ -156,20 +162,12 @@ class Scene{
 		this.gl.uniformMatrix4fv(this.program.u_ProjMatrix, false, this.projMatrix.elements);
 
 		this.gl.uniform1i(this.program.u_isLighting, true); // Will apply lighting
-		this.depth = -10;
+		this.depth = -20;
 
 	}
 	newModel(name,primitive, pos, scale){
 
-		var model = new Model({"filename":name,"gl":this.gl,"program":this.program, "pos": pos, "scale":scale,"primitiveBool": primitive});
-		if (!primitive){
-			readOBJFile(name,this.gl,this.program,model,1,0);
-		}
-		else{
-			model.initVertexBuffers(this.gl,this.program);
-			model.initCube();
-		}
-
+		var model = new Model({"filename":name,"gl":this.gl,"program":this.program, "pos": pos, "scale":scale,"primitive": primitive});
 
 		this.models.push(model);
 		return model;
@@ -181,8 +179,7 @@ class Scene{
 
 			if (this.models[i].drawingInfo){
 				this.models[i].bindBuffers(this.gl,this.program);
-				// console.log(this.models[i].drawingInfo);
-				if (this.models[i].primitive){
+				if (this.models[i].primitive == 1){
 					this.gl.drawElements(this.gl.TRIANGLES, this.models[i].drawingInfo.indices.length, this.gl.UNSIGNED_BYTE, 0);
 				}
 				else{
@@ -197,11 +194,11 @@ class Scene{
 		this.rate = 1;
 		
 		if (keypressed["37"]==true){
-			// console.log("left arrow pressed");
+			// "left arrow pressed"
 			this.eye.y+=this.rate/60;
 		}
 		if(keypressed["38"]==true){
-			// console.log("up arrow clicked")
+			// "up arrow clicked"
 			// this.eye.x+=this.rate/60;
 			var temp = this.eye.x+this.rate/60;
 			if (temp>1.1){
@@ -213,11 +210,11 @@ class Scene{
 
 		}
 		if (keypressed["39"]==true){
-			// console.log("right arrow clicked")
+			// "right arrow clicked"
 			this.eye.y-=this.rate/60;
 		}
 		if (keypressed["40"]==true){
-			// console.log("down arrow clicked")
+			// "down arrow clicked"
 			// this.eye.x-=this.rate/60;
 
 			var temp = this.eye.x-this.rate/60;
@@ -230,8 +227,8 @@ class Scene{
 		}
 		if (keypressed["87"]==true){
 			var temp = this.depth+this.rate/10;
-			if (temp>-6.5){
-				this.depth = -6.5;
+			if (temp>-10){
+				this.depth = -10;
 			}
 			else{
 				this.depth = temp;
@@ -239,8 +236,8 @@ class Scene{
 		}
 		if (keypressed["83"]==true){
 			var temp = this.depth-this.rate/10;
-			if (temp<-30){
-				this.depth = -30;
+			if (temp<-45){
+				this.depth = -45;
 			}
 			else{
 				this.depth = temp;
@@ -263,16 +260,29 @@ class Scene{
 class Model {
 
 
-	constructor({filename,gl,program, pos, scale, rot, primitiveBool}){
+	constructor({filename,gl,program, pos, scale, rot, primitive}){
 		this.name = filename;
 
-		
-		
+
+
+
 		// Coordinate transformation matrix
-		this.primitive = primitiveBool;
 		this.modelMatrix = new Matrix4();
-		this.normalMatrix = new Matrix4();
-		this.initVertexBuffers(gl,program);
+
+		// 0 for non primitive and will request for obj with given filename
+		// 1 for primitive ie cube stored in this file
+		// 2 for empty object for parenting
+		this.primitive = primitive;
+		if (this.primitive<2){
+			this.normalMatrix = new Matrix4();
+			this.initVertexBuffers(gl,program);
+			if (this.primitive==0){
+				readOBJFile(this.name,gl,program,this,1,0);
+			}
+			else{
+				this.initCube();
+			}
+		}
 		this.modelMatrix.setTranslate(0,0,0);
 
 
@@ -301,73 +311,41 @@ class Model {
 
 	addChild(model){
 		this.children.push(model);
-		var newChildMatrix = new Matrix4(this.modelMatrix);
-		model.modelMatrix = newChildMatrix;
+		// var newChildMatrix = new Matrix4();
+		// newChildMatrix.setIdentity();
+		// model.modelMatrix = newChildMatrix;
 	}
 
-	// updateTransforms(pos, scale, rot){
-		
-	// 	if (pos){
-	// 		this.modelMatrix.translate(pos.elements[0],pos.elements[1],pos.elements[2]); 
-	// 	}
-	// 	if (scale){
-	// 		this.modelMatrix.scale(scale.elements[0],scale.elements[1],scale.elements[2]);
-	// 	}
+	updateChildren(){
+		for (let i=0;i<this.children.length;i++){
+			// add if for whether that child has children
+			// this.children[i].updateTransforms(pos,scale,rot);
+			this.children[i].modelMatrix.elements = mat4.multiply(this.children[i].modelMatrix.elements,this.modelMatrix.elements,this.children[i].modelMatrix.elements)
+			this.children[i].updateChildren();
 
-	// 	if (rot){
-	// 		this.modelMatrix.rotate(rot.elements[1],0,1,0);
-	// 		this.modelMatrix.rotate(rot.elements[0],1,0,0);
-	// 		this.modelMatrix.rotate(rot.elements[2],0,0,1);
-	// 	}
-	// 	for (let i=0;i<this.children.length;i++){
-	// 		this.children[i].updateTransforms(pos,scale,rot);
-	// 	}
-	// }
-
-	updateTransforms(pos, scale, rot){
-		
-		if (pos){
-			this.updatePos(pos);
 		}
-		if (scale){
-			this.updateScale(scale);
-		}
-
-		if (rot){
-			this.modelMatrix.rotate(rot.elements[1],0,1,0);
-			this.modelMatrix.rotate(rot.elements[0],1,0,0);
-			this.modelMatrix.rotate(rot.elements[2],0,0,1);
-		}
-		// for (let i=0;i<this.children.length;i++){
-		// 	this.children[i].updateTransforms(pos,scale,rot);
-		// }
 	}
-
 	updatePos(pos){
 		if (pos){
 			this.modelMatrix.translate(pos.elements[0],pos.elements[1],pos.elements[2]); 
 		}
-		for (let i=0;i<this.children.length;i++){
-			this.children[i].updatePos(pos);
-		}
+		this.updateChildren();
 	}
 	updateScale(scale){
 		if (scale){
 			this.modelMatrix.scale(scale.elements[0],scale.elements[1],scale.elements[2]);
 		}
-		for (let i=0;i<this.children.length;i++){
-			this.children[i].updateScale(scale);
-		}
+		this.updateChildren();
 	}
 	updateRot(rot){
 		if (rot){
+			printMatrix(this.modelMatrix,this.name);
 			this.modelMatrix.rotate(rot.elements[1],0,1,0);
 			this.modelMatrix.rotate(rot.elements[0],1,0,0);
 			this.modelMatrix.rotate(rot.elements[2],0,0,1);
+			printMatrix(this.modelMatrix,this.name);
 		}
-		for (let i=0;i<this.children.length;i++){
-			this.children[i].updateRot(rot);
-		}
+		this.updateChildren();
 	}
 
 	createEmptyArrayBuffer(gl, a_attribute, num, type){
@@ -386,10 +364,9 @@ class Model {
 	}
 
 	initVertexBuffers(gl,program){
-
 		this.setVertexBuffer(this.createEmptyArrayBuffer(gl,program.a_Position,3,gl.FLOAT));
 		this.setNormalBuffer(this.createEmptyArrayBuffer(gl,program.a_Normal,3,gl.FLOAT));
-		if (this.primitive){
+		if (this.primitive==1){
 			this.setColourBuffer(this.createEmptyArrayBuffer(gl,program.a_Color,3,gl.FLOAT));
 		}
 		else{
@@ -507,6 +484,8 @@ class Model {
 	}
 	
 }
+
+//#region obj importq
 
 function readOBJFile(fileName, gl,program, model, scale, reverse){
 
@@ -758,6 +737,9 @@ class objDoc{
 	}
 }
 
+//#endregion obj import
+
+//#region basic classes and common function
 class Vertex{
 	constructor(x,y,z){
 		this.x = x;
@@ -772,7 +754,6 @@ class Eye{
 		this.z = z;
 	}
 }
-
 class Normal {
 	constructor(x,y,z){
 		this.x = x;
@@ -813,7 +794,6 @@ class DrawingInfo{
 		this.indices = indices;
 	}
 }
-
 function calcNormal(p0, p1, p2) {
 	// v0: a vector from p1 to p0, v1; a vector from p1 to p2
 	var v0 = new Float32Array(3);
@@ -833,8 +813,8 @@ function calcNormal(p0, p1, p2) {
 	var v = new Vector3(c);
 	v.normalize();
 	return v.elements;
-  }
-
+}
+//#endregion basic classes and common function
 
 
 function update(){
@@ -843,6 +823,21 @@ function update(){
 
 	Scene1.draw();
 	window.requestAnimationFrame(update);
+}
+
+function printMatrix(mat,name){
+	if (name){
+		console.log("--------------Start  "+name+"--------------")
+	}
+	else{
+		console.log("--------------Start  mat4--------------")
+	}
+	
+	console.log("| "+Math.round(mat.elements[0]*100)/100+", "+Math.round(mat.elements[4]*100)/100+", "+Math.round(mat.elements[8]*100)/100+", "+Math.round(mat.elements[12]*100)/100+" |");
+	console.log("| "+Math.round(mat.elements[1]*100)/100+", "+Math.round(mat.elements[5]*100)/100+", "+Math.round(mat.elements[9]*100)/100+", "+Math.round(mat.elements[13]*100)/100+" |");
+	console.log("| "+Math.round(mat.elements[2]*100)/100+", "+Math.round(mat.elements[6]*100)/100+", "+Math.round(mat.elements[10]*100)/100+", "+Math.round(mat.elements[14]*100)/100+" |");
+	console.log("| "+Math.round(mat.elements[3]*100)/100+", "+Math.round(mat.elements[7]*100)/100+", "+Math.round(mat.elements[11]*100)/100+", "+Math.round(mat.elements[15]*100)/100+" |");
+	console.log("--------------END--------------")
 }
 
 
@@ -861,61 +856,65 @@ function main() {
 
   	Scene1 = new Scene(gl,canvas);
 
-  	var basicCube = Scene1.newModel("cube",false);
-//   var newCube2 = Scene1.newModel("cube",false);
-//   var newCube3 = Scene1.newModel("cube",false);
-// //   newCube3.updateTransforms(new Vector3([-2,-2,-2]));
-//   newCube2.addChild(newCube3);
-
-//   newCube3.updateTransforms(new Vector3([2,2,2]));
-//   newCube2.updateTransforms(undefined, new Vector3([0.1,0.1,0.1]))
-//   newCube3.updateTransforms(undefined, new Vector3([10,10,10]));
-// //   newCube2.modelMatrix.translate(3,3,3);
-// //   var mug = Scene1.newModel("mug",false);
-// //   mug.modelMatrix.translate(-3,-3,-3);
-
-
 	//#region Table
+	var tableParent = Scene1.newModel("tableParent",2);
+	var tableTop = Scene1.newModel("tableTop",1);
+	tableTop.updateScale(new Vector3([6,0.5,3]))
 
-	var tableTop = Scene1.newModel("tableTop",true);
-	tableTop.updateTransforms(undefined, new Vector3([6,0.5,3]))
 
+	var leg1 = Scene1.newModel("leg1",1);
+	var leg2 = Scene1.newModel("leg2",1);
+	var leg3 = Scene1.newModel("leg3",1);
+	var leg4 = Scene1.newModel("leg4",1);
+	tableParent.addChild(tableTop);
+	tableParent.addChild(leg1);
+	tableParent.addChild(leg2);
+	tableParent.addChild(leg3);
+	tableParent.addChild(leg4);
 
-	var leg1 = Scene1.newModel("leg1",true);
-	tableTop.addChild(leg1);
-	leg1.modelMatrix.setIdentity();
-	leg1.updateTransforms(new Vector3([8,-1.2,3]),new Vector3([0.6,2,0.6]));
+	leg1.updatePos(new Vector3([5,-2.5,2]));
+	leg1.updateScale(new Vector3([0.6,2,0.6]));
 
-	var leg2 = Scene1.newModel("leg2",true);
-	tableTop.addChild(leg2);
-	leg2.modelMatrix.setIdentity();
-	leg2.updateTransforms(new Vector3([-8,-1.2,3]),new Vector3([0.6,2,0.6]));
+	leg2.updatePos(new Vector3([-5,-2.5,2]));
+	leg2.updateScale(new Vector3([0.6,2,0.6]));
 
-	var leg3 = Scene1.newModel("leg3",true);
-	tableTop.addChild(leg3);
-	leg3.modelMatrix.setIdentity();
-	leg3.updateTransforms(new Vector3([-8,-1.2,-3]),new Vector3([0.6,2,0.6]));
+	leg3.updatePos(new Vector3([5,-2.5,-2]));
+	leg3.updateScale(new Vector3([0.6,2,0.6]));
 
-	var leg4 = Scene1.newModel("leg4",true);
-	tableTop.addChild(leg4);
-	leg4.modelMatrix.setIdentity();
-	leg4.updateTransforms(new Vector3([8,-1.2,-3]),new Vector3([0.6,2,0.6]));
+	leg4.updatePos(new Vector3([-5,-2.5,-2]));
+	leg4.updateScale(new Vector3([0.6,2,0.6]));
 
-	// tableTop.updateTransforms(undefined, new Vector3([0.5,0.5,0.5]))
-	tableTop.updateTransforms(new Vector3([0,-2,0]))
-	// console.log(tableTop.modelMatrix);
-	// tableTop.modelMatrix.elements = mat4.multiplyScalar(tableTop.modelMatrix.elements,tableTop.modelMatrix.elements,100);
-	// console.log(tableTop.modelMatrix);
-
+	tableParent.updatePos(new Vector3([0,-0.5,0]));
+	tableParent.updateRot(new Vector3([0,45,0]))
+	tableParent.updateScale(new Vector3([0.7,0.4,0.7]));
+	
+	let mug = Scene1.newModel("mug",0);
+	mug.updateScale(new Vector3([0.6,0.6,0.6]))
+	mug.updatePos(new Vector3([2,-1.2,-3.5]))
 	//#endregion Table
 
-	var floor = Scene1.newModel("quad",false);
-	floor.updateTransforms(new Vector3([0,-10,0]), new Vector3([20,1,20]))
+	var floor = Scene1.newModel("quad",0);
+	floor.updatePos(new Vector3([0,-3,0]))
+	floor.updateScale(new Vector3([10,1,10]))
 
-	// var sofa1 = Scene1.newModel("sofa1",false);
+	var sofa1 = Scene1.newModel("sofa1",0);
+	sofa1.updatePos(new Vector3([8.9,-2.5,1.5]))
 
+	var plateParent = Scene1.newModel("plateParent",2)
+	var plateBase = Scene1.newModel("plateBase",1);
+	plateBase.updateScale(new Vector3([0.8,0.1,0.8]))
+	plateParent.addChild(plateBase);
 
+	var side1 = Scene1.newModel("side1",1);
+	// var side2 = Scene1.newModel("side2",1);
+	// var side3 = Scene1.newModel("side3",1);
+	// var side4 = Scene1.newModel("side4",1);
+	side1.updatePos(new Vector3([0.8,0.05,0]));
+	side1.updateRot(new Vector3([0,0,50]))
+	side1.updateScale(new Vector3([0.15,0.15,0.8]));
 	
+
+
 	document.onkeydown = function(ev){
 		keypressed[ev.keyCode] = true;
 
