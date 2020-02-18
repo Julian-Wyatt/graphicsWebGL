@@ -27,6 +27,9 @@ app.get("/sofa1",function(req,res){
 		res.send(data);
 	})
 });
+app.get("/Texture/sofa1",function(req,res){
+	res.sendFile(path.join(__dirname, 'Textures', 'sofa1Texture.jpg'));
+});
 app.get("/bulb",function(req,res){
 	fs.readFile(path.join(__dirname, 'Models', 'bulb.obj'),function(err,data){
 		res.send(data);
