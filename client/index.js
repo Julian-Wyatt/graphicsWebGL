@@ -5,7 +5,7 @@ class Scene{
 		this.gl = gl;
 		this.canvas = canvas;
 
-		//#region shaders
+		//region shaders
 		// point light per fragment
 		var VSHADER_SOURCE =
 		'#ifdef GL_ES\n' +
@@ -14,6 +14,7 @@ class Scene{
 		'attribute vec4 a_Position;\n' +
 		'attribute vec4 a_Color;\n' +
 		'attribute vec4 a_Normal;\n' +        // Normal
+		'attribute vec2 a_TexCoords;\n' +
 		'uniform mat4 u_ModelMatrix;\n' +
 		'uniform mat4 u_NormalMatrix;\n' +
 		// 'uniform mat4 u_ViewMatrix;\n' +
@@ -22,10 +23,11 @@ class Scene{
 		'uniform vec3 u_LightColor;\n' +     // Light color
 		'uniform vec3 u_LightPosition;\n' + // Light direction (in the world coordinate, normalized)
 		"uniform vec3 u_AmbientLight;\n" +
+		'uniform bool u_isLighting;\n' +
 		'varying vec4 v_Color;\n' +
 		"varying vec3 v_Normal;\n" +
 		"varying vec3 v_Position;\n" +
-		'uniform bool u_isLighting;\n' +
+		'varying vec2 v_TexCoords;\n' +
 		'void main() {\n' +
 		// '  gl_Position = u_ProjMatrix * u_ViewMatrix * u_ModelMatrix * a_Position;\n' +
 		'  gl_Position = u_MVPMatrix * u_ModelMatrix * a_Position;\n' +
@@ -39,18 +41,22 @@ class Scene{
 		'  {\n' +
 		'     v_Color = a_Color;\n' +
 		'  }\n' + 
+		'  v_TexCoords = a_TexCoords;\n' +
 		'}\n';
 		  // Fragment shader program for point light
 		var FSHADER_SOURCE =
 		'#ifdef GL_ES\n' +
 		'precision mediump float;\n' +
 		'#endif\n' +
+		'uniform bool u_UseTextures;\n' +    // Texture enable/disable flag
 		'uniform vec3 u_LightColor;\n' +	//light colour
 		"uniform vec3 u_LightPosition;\n"+	//position of the light source
 		"uniform vec3 u_AmbientLight;\n" + 	//ambient light colour
 		'varying vec3 v_Normal;\n' +
 		'varying vec3 v_Position;\n' +
 		'varying vec4 v_Color;\n' +
+		'uniform sampler2D u_Sampler;\n' +
+		'varying vec2 v_TexCoords;\n' +
 		'void main() {\n' +
 		// Normalize normal because it's interpolated and not 1.0 (length)
 		"	vec3 normal = normalize(v_Normal);\n"+
@@ -59,7 +65,13 @@ class Scene{
 		// The dot product of the light direction and the normal
 		"	float nDotL = max(dot(lightDirection,normal),0.0);\n"+
 		// Calculate the final color from diffuse and ambient reflection
+		'  vec3 diffuse;\n' +
+		'  if (u_UseTextures) {\n' +
+		'     vec4 TexColor = texture2D(u_Sampler, v_TexCoords);\n' +
+		'     diffuse = u_LightColor * TexColor.rgb * nDotL * 1.2;\n' +
+		'  } else {\n' +
 		"	vec3 diffuse = u_LightColor * v_Color.rgb * nDotL;\n"+
+		'  }\n' +
 		"	vec3 ambient = u_AmbientLight * v_Color.rgb;\n"+
 		'  gl_FragColor = vec4(diffuse + ambient, v_Color.a);\n' +
 		'}\n';
@@ -131,6 +143,7 @@ class Scene{
 		this.program.a_Position = this.gl.getAttribLocation(this.program, 'a_Position');
 		this.program.a_Normal = this.gl.getAttribLocation(this.program, 'a_Normal');
 		this.program.a_Color = this.gl.getAttribLocation(this.program, 'a_Color');
+		this.program.a_TexCoords = this.gl.getAttribLocation(this.program, 'a_TexCoords');
 		this.program.u_ModelMatrix = this.gl.getUniformLocation(this.program, 'u_ModelMatrix');
 		this.program.u_NormalMatrix = this.gl.getUniformLocation(this.program,"u_NormalMatrix");
 		this.program.u_MVPMatrix = this.gl.getUniformLocation(this.program,"u_MVPMatrix");
@@ -145,12 +158,22 @@ class Scene{
 			console.log('Failed to Get the storage locations of u_ViewMatrix, and/or u_ProjMatrix');
 			return;
 		}
+		this.program.u_Sampler = gl.getUniformLocation(this.program, 'u_Sampler');
+		if (!this.program.u_Sampler) {
+		  console.log('Failed to get the storage location of u_Sampler');
+		  return false;
+		}
+		this.program.u_UseTextures = gl.getUniformLocation(this.program, "u_UseTextures");
+		if (!this.program.u_UseTextures) { 
+		  console.log('Failed to get the storage location for texture map enable flag');
+		  return;
+		}
 
 		// Set the light color (white)
 		this.gl.uniform3f(this.program.u_LightColor, 1, 1, 1);
 		// this.gl.uniform3f(this.program.u_AmbientLight, 0.2, 0.2, 0.2);
-		this.gl.uniform3f(this.program.u_AmbientLight,0.01, 0.01, 0.01);
-		this.gl.uniform3f(this.program.u_LightPosition, 0, 8.5, 0);
+		this.gl.uniform3f(this.program.u_AmbientLight,0.5, 0.5, 0.5);
+		this.gl.uniform3f(this.program.u_LightPosition, 0, 22, 0);
 
 		// Calculate the view matrix and the projection matrix
 
@@ -172,9 +195,9 @@ class Scene{
 		this.depth = -20;
 
 	}
-	newModel(name,primitive, pos, scale){
+	newModel(name,primitive,texture, pos, scale){
 
-		var model = new Model({"filename":name,"gl":this.gl,"program":this.program, "pos": pos, "scale":scale,"primitive": primitive});
+		var model = new Model({"filename":name,"gl":this.gl,"program":this.program, "pos": pos, "scale":scale,"primitive": primitive,"texture":texture});
 
 		this.models.push(model);
 		return model;
@@ -273,12 +296,11 @@ class Scene{
 class Model {
 
 
-	constructor({filename,gl,program, pos, scale, rot, primitive}){
+	constructor({filename,gl,program, pos, scale, rot, primitive, texture}){
 		this.name = filename;
 
-
-
-
+		this.textures = [texture];
+		this.activeTexture = 0;
 		// Coordinate transformation matrix
 		this.modelMatrix = new Matrix4();
 
@@ -375,23 +397,43 @@ class Model {
 	}
 
 	initVertexBuffers(gl,program){
-		this.setVertexBuffer(this.createEmptyArrayBuffer(gl,program.a_Position,3,gl.FLOAT));
-		this.setNormalBuffer(this.createEmptyArrayBuffer(gl,program.a_Normal,3,gl.FLOAT));
+		this.vertexBuffer = this.createEmptyArrayBuffer(gl,program.a_Position,3,gl.FLOAT)
+		this.normalBuffer = this.createEmptyArrayBuffer(gl,program.a_Normal,3,gl.FLOAT);
 		if (this.primitive==1){
-			this.setColourBuffer(this.createEmptyArrayBuffer(gl,program.a_Color,3,gl.FLOAT));
+			this.colourBuffer = this.createEmptyArrayBuffer(gl,program.a_Color,3,gl.FLOAT);
 		}
 		else{
-			this.setColourBuffer(this.createEmptyArrayBuffer(gl,program.a_Color,4,gl.FLOAT));
+			this.colourBuffer = this.createEmptyArrayBuffer(gl,program.a_Color,4,gl.FLOAT);
 		}
 		
-		this.setIndexBuffer(gl.createBuffer());
+		this.indexBuffer = gl.createBuffer();
 		gl.bindBuffer(gl.ARRAY_BUFFER, null);
+		if (this.drawingInfo){
+			if (typeof (this.drawingInfo.textCoords)!= undefined){
+				this.texCoordsBuffer =  this.createEmptyArrayBuffer(gl,program.a_TexCoords,2,gl.FLOAT)
+			}
+		}
+
 	}
 
 	bindBuffers(gl,program){
 		// get drawing info
 		// Acquire the vertex coordinates and colors from OBJ file
+
+
 		this.initVertexBuffers(gl,program);
+
+		if (this.textures[this.activeTexture]){
+			if (this.textures[this.activeTexture].loaded){
+				this.textures[this.activeTexture].bindTexture(gl,program);
+			}
+			
+		}
+		else{
+			// Enable texture mapping
+		gl.uniform1i(program.u_UseTextures, false);
+		}
+		
 		// Write data into the buffer object
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
 		gl.bufferData(gl.ARRAY_BUFFER, this.drawingInfo.vertices, gl.STATIC_DRAW);
@@ -406,6 +448,11 @@ class Model {
 		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
 		gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.drawingInfo.indices, gl.STATIC_DRAW);
 
+		if (typeof (this.drawingInfo.textCoords)!= undefined){
+			gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordsBuffer);
+			gl.bufferData(gl.ARRAY_BUFFER, this.drawingInfo.textCoords, gl.STATIC_DRAW);
+		}
+
 		this.normalMatrix.setInverseOf(this.modelMatrix);
 		this.normalMatrix.transpose();
 
@@ -413,30 +460,9 @@ class Model {
 
 		gl.uniformMatrix4fv(program.u_ModelMatrix, false, this.modelMatrix.elements);
 	}
-
-	// #region Getters and Setters 
-	setVertexBuffer(newVB){
-		this.vertexBuffer = newVB;
+	changeTexture(){
+		this.activeTexture = (this.activeTexture + 1) % this.textures.length
 	}
-	setNormalBuffer(newNB){
-		this.normalBuffer = newNB;
-	}
-	setColourBuffer(newCB){
-		this.colourBuffer = newCB;
-	}
-	setIndexBuffer(newIB){
-		this.indexBuffer = newIB;
-	}
-	getVertexBuffer(){
-		return this.vertexBuffer;
-	}
-	getNormalBuffer(){
-		return this.normalBuffer;
-	}
-	getColourBuffer(){
-		return this.colourBuffer;
-	}
-	// #endregion 
 
 	initCube(){
 		// Create a cube
@@ -462,15 +488,14 @@ class Model {
 	   
 	   
 		 var colors = new Float32Array([    // Colors
-		   1, 0, 0,   1, 0, 0,   1, 0, 0,  1, 0, 0,     // v0-v1-v2-v3 front
-		   1, 0, 0,   1, 0, 0,   1, 0, 0,  1, 0, 0,     // v0-v3-v4-v5 right
-		   1, 0, 0,   1, 0, 0,   1, 0, 0,  1, 0, 0,     // v0-v5-v6-v1 up
-		   1, 0, 0,   1, 0, 0,   1, 0, 0,  1, 0, 0,     // v1-v6-v7-v2 left
-		   1, 0, 0,   1, 0, 0,   1, 0, 0,  1, 0, 0,     // v7-v4-v3-v2 down
-		   1, 0, 0,   1, 0, 0,   1, 0, 0,  1, 0, 0　    // v4-v7-v6-v5 back
+		   1, 1, 1,   1, 1, 1,   1, 1, 1,  1, 1, 1,      // v0-v1-v2-v3 front
+		   1, 1, 1,   1, 1, 1,   1, 1, 1,  1, 1, 1,      // v0-v3-v4-v5 right
+		   1, 1, 1,   1, 1, 1,   1, 1, 1,  1, 1, 1,      // v0-v5-v6-v1 up
+		   1, 1, 1,   1, 1, 1,   1, 1, 1,  1, 1, 1,      // v1-v6-v7-v2 left
+		   1, 1, 1,   1, 1, 1,   1, 1, 1,  1, 1, 1,      // v7-v4-v3-v2 down
+		   1, 1, 1,   1, 1, 1,   1, 1, 1,  1, 1, 1       // v4-v7-v6-v5 back
 		]);
-	   
-	   
+	   	   
 		 var normals = new Float32Array([    // Normal
 		   0.0, 0.0, 1.0,   0.0, 0.0, 1.0,   0.0, 0.0, 1.0,   0.0, 0.0, 1.0,  // v0-v1-v2-v3 front
 		   1.0, 0.0, 0.0,   1.0, 0.0, 0.0,   1.0, 0.0, 0.0,   1.0, 0.0, 0.0,  // v0-v3-v4-v5 right
@@ -479,8 +504,17 @@ class Model {
 		   0.0,-1.0, 0.0,   0.0,-1.0, 0.0,   0.0,-1.0, 0.0,   0.0,-1.0, 0.0,  // v7-v4-v3-v2 down
 		   0.0, 0.0,-1.0,   0.0, 0.0,-1.0,   0.0, 0.0,-1.0,   0.0, 0.0,-1.0   // v4-v7-v6-v5 back
 		 ]);
-	   
-	   
+
+		   // Texture Coordinates
+		var texCoords = new Float32Array([
+			1.0, 1.0,    0.0, 1.0,   0.0, 0.0,   1.0, 0.0,  // v0-v1-v2-v3 front
+			0.0, 1.0,    0.0, 0.0,   1.0, 0.0,   1.0, 1.0,  // v0-v3-v4-v5 right
+			1.0, 0.0,    1.0, 1.0,   0.0, 1.0,   0.0, 0.0,  // v0-v5-v6-v1 up
+			1.0, 1.0,    0.0, 1.0,   0.0, 0.0,   1.0, 0.0,  // v1-v6-v7-v2 left
+			0.0, 0.0,    1.0, 0.0,   1.0, 1.0,   0.0, 1.0,  // v7-v4-v3-v2 down
+			0.0, 0.0,    1.0, 0.0,   1.0, 1.0,   0.0, 1.0   // v4-v7-v6-v5 back
+		]);
+
 		 // Indices of the vertices
 		 var indices = new Uint8Array([
 			0, 1, 2,   0, 2, 3,    // front
@@ -491,7 +525,7 @@ class Model {
 		   20,21,22,  20,22,23     // back
 		]);
 
-		this.drawingInfo = new DrawingInfo(vertices,normals,colors,indices);
+		this.drawingInfo = new DrawingInfo(vertices,normals,colors,indices,texCoords);
 	}
 	
 }
@@ -548,6 +582,7 @@ class objDoc{
 		this.vertices = Array(0);
 		this.objects = Array(0);
 		this.normals = Array(0);
+		this.vertexTextures = Array(0);
 
 	}
 	parse(fileString, scale, reverseNormal){
@@ -584,6 +619,13 @@ class objDoc{
 					var z = words[3]*scale;
 					var vertex = new Vertex (x,y,z);
 					this.vertices.push(vertex);
+					continue;
+				case "vt":
+					var u = words[1];
+					var v = words[2];
+					// ignore depth
+					var textCoord = new VertexTexture (u,v);
+					this.vertexTextures.push(textCoord);
 					continue;
 				case "vn":
 					var x = words[1];
@@ -688,6 +730,7 @@ class objDoc{
 		  }
 		  var numVertices = numIndices;
 		  var vertices = new Float32Array(numVertices * 3);
+		  var textCoords = new Float32Array(numVertices * 2);
 		  var normals = new Float32Array(numVertices * 3);
 		  var colors = new Float32Array(numVertices * 4);
 		  var indices = new Uint16Array(numIndices);
@@ -706,9 +749,20 @@ class objDoc{
 				// Copy vertex
 				var vIdx = face.vIndices[k];
 				var vertex = this.vertices[vIdx];
+				
 				vertices[index_indices * 3 + 0] = vertex.x;
 				vertices[index_indices * 3 + 1] = vertex.y;
 				vertices[index_indices * 3 + 2] = vertex.z;
+
+				// vertex Texture Info
+				// if (this.vertexTextures[vIdx]){
+				// 	var vertexText = this.vertexTextures[vIdx];
+				// 	textCoords[index_indices * 2 + 0] = vertexText.u;
+				// 	textCoords[index_indices * 2 + 1] = vertexText.v;
+				// }
+				var vertexText = this.vertexTextures[vIdx];
+				textCoords[index_indices * 2 + 0] = vertexText.U;
+				textCoords[index_indices * 2 + 1] = vertexText.V;
 				// Copy color
 				colors[index_indices * 4 + 0] = color.r;
 				colors[index_indices * 4 + 1] = color.g;
@@ -730,8 +784,7 @@ class objDoc{
 			  }
 			}
 		  }
-		
-		  return new DrawingInfo(vertices, normals, colors, indices);
+		  return new DrawingInfo(vertices, normals, colors, indices, textCoords);
 	}
 	findColor(name){
 		if (name){
@@ -753,20 +806,51 @@ class objDoc{
 //#endregion obj import
 
 class Texture{
-	constructor(name){
+	constructor(name,gl){
 		this.name = name;
-		this.loaded = false
+		this.loaded = false;
+		this.img = new Image();
+		this.img.src = "/Texture/"+this.name;
+		this.img.onload = this.onTextureLoad(gl);
+		
 	}
-	requestTexture(){
-		var request = new XMLHttpRequest();
-		request.onreadystatechange = function (){
-			if (request.readyState === 4 && request.status !== 404) {
-				console.log(request.response);
-			}
+	onTextureLoad(gl){
+		console.log(this)
+			this.textureBuffer = gl.createTexture();
+			this.loaded = true;
+			// this.bindTexture(gl,program)
+	}
+	bindTexture(gl,program){
+		if (this.img){
+			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1); // Flip the image's y axis
+
+			// Enable texture unit0
+			gl.activeTexture(gl.TEXTURE0);
+		  
+			// Bind the texture object to the target
+	
+			gl.bindTexture(gl.TEXTURE_2D, this.textureBuffer);
+			// Set the texture image
+			
+			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, this.img);
+			
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.MIRRORED_REPEAT);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.MIRRORED_REPEAT);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+		  
+			// Assign u_Sampler to TEXTURE0
+			gl.uniform1i(program.u_Sampler, 0);
+		  
+			// Enable texture mapping
+			gl.uniform1i(program.u_UseTextures, true);
 		}
-		request.open("GET",this.name,true);
-		request.send();
+		else{
+			// Disable texture mapping
+			gl.uniform1i(program.u_UseTextures, false);
+		}
 	}
+
 }
 //#region basic classes and common function
 class Vertex{
@@ -774,6 +858,12 @@ class Vertex{
 		this.x = x;
 		this.y = y;
 		this.z = z;
+	}
+}
+class VertexTexture{
+	constructor(U,V){
+		this.U = U;
+		this.V = V;
 	}
 }
 class Eye{
@@ -816,11 +906,12 @@ class OBJObject {
 	}
 }
 class DrawingInfo{
-	constructor(vertices,normals,colours,indices){
+	constructor(vertices,normals,colours,indices,textCoords){
 		this.vertices = vertices;
 		this.normals = normals;
 		this.colours = colours;
 		this.indices = indices;
+		this.textCoords = textCoords;
 	}
 }
 function calcNormal(p0, p1, p2) {
@@ -849,8 +940,12 @@ function calcNormal(p0, p1, p2) {
 function update(){
 	
 	Scene1.updateCamera();
-
 	Scene1.draw();
+
+	if (keypressed["32"]){
+		Scene1.models[0].changeTexture();
+	}
+
 	window.requestAnimationFrame(update);
 }
 
@@ -888,89 +983,93 @@ function main() {
   	Scene1 = new Scene(gl,canvas);
 
 	//#region Table
-	var tableParent = Scene1.newModel("tableParent",2);
-	var tableTop = Scene1.newModel("tableTop",1);
-	tableTop.updateScale(new Vector3([6,0.5,3]))
+	// var tableParent = Scene1.newModel("tableParent",2);
+	// var tableTop = Scene1.newModel("tableTop",1);
+	// tableTop.updateScale(new Vector3([6,0.5,3]))
 
 
-	var leg1 = Scene1.newModel("leg1",1);
-	var leg2 = Scene1.newModel("leg2",1);
-	var leg3 = Scene1.newModel("leg3",1);
-	var leg4 = Scene1.newModel("leg4",1);
-	tableParent.addChild(tableTop);
-	tableParent.addChild(leg1);
-	tableParent.addChild(leg2);
-	tableParent.addChild(leg3);
-	tableParent.addChild(leg4);
+	// var leg1 = Scene1.newModel("leg1",1);
+	// var leg2 = Scene1.newModel("leg2",1);
+	// var leg3 = Scene1.newModel("leg3",1);
+	// var leg4 = Scene1.newModel("leg4",1);
+	// tableParent.addChild(tableTop);
+	// tableParent.addChild(leg1);
+	// tableParent.addChild(leg2);
+	// tableParent.addChild(leg3);
+	// tableParent.addChild(leg4);
 
-	leg1.updatePos(new Vector3([5,-2.5,2]));
-	leg1.updateScale(new Vector3([0.6,2,0.6]));
+	// leg1.updatePos(new Vector3([5,-2.5,2]));
+	// leg1.updateScale(new Vector3([0.6,2,0.6]));
 
-	leg2.updatePos(new Vector3([-5,-2.5,2]));
-	leg2.updateScale(new Vector3([0.6,2,0.6]));
+	// leg2.updatePos(new Vector3([-5,-2.5,2]));
+	// leg2.updateScale(new Vector3([0.6,2,0.6]));
 
-	leg3.updatePos(new Vector3([5,-2.5,-2]));
-	leg3.updateScale(new Vector3([0.6,2,0.6]));
+	// leg3.updatePos(new Vector3([5,-2.5,-2]));
+	// leg3.updateScale(new Vector3([0.6,2,0.6]));
 
-	leg4.updatePos(new Vector3([-5,-2.5,-2]));
-	leg4.updateScale(new Vector3([0.6,2,0.6]));
+	// leg4.updatePos(new Vector3([-5,-2.5,-2]));
+	// leg4.updateScale(new Vector3([0.6,2,0.6]));
 
-	tableParent.updatePos(new Vector3([0,-0.5,0]));
-	tableParent.updateRot(new Vector3([0,45,0]))
-	tableParent.updateScale(new Vector3([0.7,0.4,0.7]));
+	// tableParent.updatePos(new Vector3([0,-0.5,0]));
+	// tableParent.updateRot(new Vector3([0,45,0]))
+	// tableParent.updateScale(new Vector3([0.7,0.4,0.7]));
 	
-	let mug = Scene1.newModel("mug",0);
-	mug.updateScale(new Vector3([0.6,0.6,0.6]))
-	mug.updatePos(new Vector3([0,-1.2,-3.5]))
-	var plate = Scene1.newModel("plate",0)
-	plate.updateScale(new Vector3([1.1,1.1,1.1]));
-	plate.updatePos(new Vector3([0.8,-0.5,0]))
+	// let mug = Scene1.newModel("mug",0);
+	// mug.updateScale(new Vector3([0.6,0.6,0.6]))
+	// mug.updatePos(new Vector3([0,-1.2,-3.5]))
+	// var plate = Scene1.newModel("plate",0)
+	// plate.updateScale(new Vector3([1.1,1.1,1.1]));
+	// plate.updatePos(new Vector3([0.8,-0.5,0]))
 
-	tableParent.addChild(plate)
-	tableParent.addChild(mug);
-	//#endregion Table
+	// tableParent.addChild(plate)
+	// // tableParent.addChild(mug);
+	// //#endregion Table
 
-	var floor = Scene1.newModel("quad",0);
-	floor.updatePos(new Vector3([0,-3,0]))
-	floor.updateScale(new Vector3([10,1,10]))
+	// var floor = Scene1.newModel("quad",0);
+	// floor.updatePos(new Vector3([0,-3,0]))
+	// floor.updateScale(new Vector3([10,1,10]))
 
 	//#region sofas
+	var text = new Texture("sofa1",Scene1.gl,Scene1.program);
+	var cube = Scene1.newModel("sofa1",0,text);
+	cube.updateScale(new Vector3([4,4,4]))
+	var text = new Texture("sofa1",Scene1.gl,Scene1.program);
+	cube.textures.push()
+	// var sofa1 = Scene1.newModel("sofa1",0,text);
+	// sofa1.updatePos(new Vector3([8.9,-2.5,1.2]))
 
-	var sofa1 = Scene1.newModel("sofa1",0);
-	sofa1.updatePos(new Vector3([8.9,-2.5,1.2]))
+	// var sofa2 = Scene1.newModel("sofa2",0);
+	// sofa2.updatePos(new Vector3([5,-2.5,9.5]))
+	// sofa2.updateRot(new Vector3([0,-30,0]))
+	// sofa2.updatePos(new Vector3([1.2,0,0]))
 
-	var sofa2 = Scene1.newModel("sofa2",0);
-	sofa2.updatePos(new Vector3([5,-2.5,9.5]))
-	sofa2.updateRot(new Vector3([0,-30,0]))
-	sofa2.updatePos(new Vector3([1.2,0,0]))
-
-	var sofa3 = Scene1.newModel("sofa2",0);
-	sofa3.updatePos(new Vector3([6,-2.5,-5]))
-	sofa3.updateRot(new Vector3([0,30,0]))
-	sofa3.updatePos(new Vector3([2.5,0,1]))
+	// var sofa3 = Scene1.newModel("sofa2",0);
+	// sofa3.updatePos(new Vector3([6,-2.5,-5]))
+	// sofa3.updateRot(new Vector3([0,30,0]))
+	// sofa3.updatePos(new Vector3([2.5,0,1]))
 
 	//#endregion sofas
 
 	// sort scaling/ position after fixing tv stand
-	var TVStand = Scene1.newModel("TV_Stand",0)
-	TVStand.updatePos(new Vector3([-8,-1.6,3]))
-	TVStand.updateScale(new Vector3([1,0.7,1.5]))
+	// var TVStand = Scene1.newModel("TV_Stand",0)
+	// TVStand.updatePos(new Vector3([-8,-1.6,3]))
+	// TVStand.updateScale(new Vector3([1,0.7,1.5]))
 
-	var TV = Scene1.newModel("TV",0)
-	TV.updatePos(new Vector3([-8,4,0]))
+	// var TV = Scene1.newModel("TV",0)
+	// TV.updatePos(new Vector3([-8,4,0]))
 
-	var soundbar = Scene1.newModel("Soundbar",0)
-	soundbar.updatePos(new Vector3([-8,1,0]))
-
-
-
-	var bulb = Scene1.newModel("bulb",0)
-	bulb.updatePos(new Vector3([0,10,0]))
-	bulb.updateRot(new Vector3([180,0,0]))
-	bulb.updateScale(new Vector3([0.5,0.5,0.5]))
+	// var soundbar = Scene1.newModel("Soundbar",0)
+	// soundbar.updatePos(new Vector3([-8,1,0]))
 
 
-	var text = new Texture("sofa");
+
+	// var bulb = Scene1.newModel("bulb",0)
+	// bulb.updatePos(new Vector3([0,10,0]))
+	// bulb.updateRot(new Vector3([180,0,0]))
+	// bulb.updateScale(new Vector3([0.5,0.5,0.5]))
+
+
+	
 	document.onkeydown = function(ev){
 		keypressed[ev.keyCode] = true;
 
