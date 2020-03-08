@@ -1,0 +1,69 @@
+{
+    "env": {
+        "browser": true,
+		"es6": true,
+		"node":true,
+		"jquery": true,
+		"jest":true
+	
+
+    },
+    "extends": "eslint:recommended",
+    "parserOptions": {
+        "ecmaVersion": 2018,
+        "sourceType": "module"
+    },
+    "rules": {
+        "indent": [
+            "error",
+            "tab"
+        ],
+        "linebreak-style": [
+            "error",
+            "unix"
+        ],
+        "quotes": [
+            "error",
+            "double"
+        ],
+        "semi": [
+            "error",
+            "always"
+		],
+		"no-console": "off",
+		"padded-blocks":"error",
+		"padding-line-between-statements":"error",
+		"space-before-blocks":"error",
+		"space-before-function-paren":"error",
+		"space-in-parens":"error",
+		"space-infix-ops":"error",
+		"no-trailing-spaces":"error",
+		"no-multiple-empty-lines":"error",
+		"spaced-comment":"error",
+		"no-var":"error",
+		"vars-on-top":"error",
+		"valid-jsdoc": [1, {
+			"prefer": {
+				"return": "returns"
+			}
+		}],
+		"require-jsdoc": ["error", {
+			"require": {
+				"FunctionDeclaration": true,
+				"MethodDefinition": false,
+				"ClassDeclaration": false,
+				"ArrowFunctionExpression": true,
+				"FunctionExpression": true
+			}
+		}]
+	},
+	"globals": {
+		"Vector3":"readonly",
+		"initShaders":"readonly",
+		"Matrix4":"readonly",
+		"mat4":"readonly",
+		"vec3":"readonly",
+		"loadShader":"readonly",
+		"getWebGLContext":"readonly "
+	}
+}
