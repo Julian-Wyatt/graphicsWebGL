@@ -40,7 +40,7 @@ function createProgram(gl, vshader, fshader) {
     return null;
   }
 
-  // Attach the shader objects
+  // Attach the shader object
   gl.attachShader(program, vertexShader);
   gl.attachShader(program, fragmentShader);
 
@@ -62,7 +62,7 @@ function createProgram(gl, vshader, fshader) {
 
 /**
  * Create a shader object
- * @param gl GL context
+ * @param gl GL contex
  * @param type the type of the shader object to be created
  * @param source shader program (string)
  * @return created shader object, or null if the creation has failed.

@@ -16,13 +16,13 @@ var Matrix4 = function(opt_src) {
   var i, s, d;
   if (opt_src && typeof opt_src === 'object' && opt_src.hasOwnProperty('elements')) {
     s = opt_src.elements;
-    d = new Float32Array(16);
+    d = new Float64Array(16);
     for (i = 0; i < 16; ++i) {
       d[i] = s[i];
     }
     this.elements = d;
   } else {
-    this.elements = new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
+    this.elements = new Float64Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
   }
 };
 
@@ -76,7 +76,7 @@ Matrix4.prototype.concat = function(other) {
   
   // If e equals b, copy b to temporary matrix.
   if (e === b) {
-    b = new Float32Array(16);
+    b = new Float64Array(16);
     for (i = 0; i < 16; ++i) {
       b[i] = e[i];
     }
@@ -97,7 +97,7 @@ Matrix4.prototype.multiply = Matrix4.prototype.concat;
 /**
  * Multiply the three-dimensional vector.
  * @param pos  The multiply vector
- * @return The result of multiplication(Float32Array)
+ * @return The result of multiplication(Float64Array)
  */
 Matrix4.prototype.multiplyVector3 = function(pos) {
   var e = this.elements;
@@ -115,7 +115,7 @@ Matrix4.prototype.multiplyVector3 = function(pos) {
 /**
  * Multiply the four-dimensional vector.
  * @param pos  The multiply vector
- * @return The result of multiplication(Float32Array)
+ * @return The result of multiplication(Float64Array)
  */
 Matrix4.prototype.multiplyVector4 = function(pos) {
   var e = this.elements;
@@ -160,7 +160,7 @@ Matrix4.prototype.setInverseOf = function(other) {
 
   s = other.elements;
   d = this.elements;
-  inv = new Float32Array(16);
+  inv = new Float64Array(16);
 
   inv[0]  =   s[5]*s[10]*s[15] - s[5] *s[11]*s[14] - s[9] *s[6]*s[15]
             + s[9]*s[7] *s[14] + s[13]*s[6] *s[11] - s[13]*s[7]*s[10];
@@ -493,7 +493,6 @@ Matrix4.prototype.setRotate = function(angle, x, y, z) {
 
   s = Math.sin(angle);
   c = Math.cos(angle);
-
   if (0 !== x && 0 === y && 0 === z) {
     // Rotation around X axis
     if (x < 0) {
@@ -523,7 +522,7 @@ Matrix4.prototype.setRotate = function(angle, x, y, z) {
     e[3] = 0;  e[7] = 0;  e[11] = 0;  e[15] = 1;
   } else {
     // Rotation around another axis
-    len = Math.sqrt(x*x + y*y + z*z);
+	len = Math.sqrt(x*x + y*y + z*z);
     if (len !== 1) {
       rlen = 1 / len;
       x *= rlen;
@@ -558,7 +557,6 @@ Matrix4.prototype.setRotate = function(angle, x, y, z) {
     e[14] = 0;
     e[15] = 1;
   }
-
   return this;
 };
 
@@ -698,7 +696,7 @@ Matrix4.prototype.dropShadowDirectionally = function(normX, normY, normZ, planeX
 /**
  * Constructor of Vector3
  * If opt_src is specified, new vector is initialized by opt_src.
- * @param opt_src source vector(option)
+ * @param opt_src source vector(option) 
  */
 var Vector3 = function(opt_src) {
   var v = new Float32Array(3);
