@@ -1,6 +1,6 @@
 # Blender v2.81 (sub 16) OBJ File: 'TV_Stand.blend'
 # www.blender.org
-mtllib TV_Stand1.mtl
+mtllib TV_Stand.mtl
 o Cube
 v 1.000000 1.447053 -8.306486
 v 1.000000 -0.590034 -8.969330
