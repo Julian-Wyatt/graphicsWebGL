@@ -1,140 +1,166 @@
+// /* eslint-disable*/
+
 // references:
 // https://github.com/arthurlee/WebGLProgrammingGuideBookStudy/blob/master/official_source_code/examples/ch10/OBJViewer.js
 // Practical 3 - Chair.js
 
+// #region shaders
+// point light per fragment
+let VSHADER_SOURCE_DEFAULT =
+"#ifdef GL_ES\n" +
+"precision mediump float;\n" +
+"#endif\n" +
+"attribute vec4 a_Position;\n" +
+"attribute vec4 a_Color;\n" +
+"attribute vec4 a_Normal;\n" +        // Normal
+"attribute vec2 a_TexCoords;\n" +
+"uniform mat4 u_ModelMatrix;\n" +
+"uniform mat4 u_NormalMatrix;\n" +
+// 'uniform mat4 u_ViewMatrix;\n' +
+"uniform mat4 u_MVPMatrix;\n" +
+// 'uniform mat4 u_ProjMatrix;\n' +
+"uniform vec3 u_LightColor;\n" +     // Light color
+"uniform vec3 u_LightPosition;\n" + // Light direction (in the world coordinate, normalized)
+"uniform vec3 u_AmbientLight;\n" +
+"uniform bool u_isLighting;\n" +
+"varying vec4 v_Color;\n" +
+"varying vec3 v_Normal;\n" +
+"varying vec3 v_Position;\n" +
+"varying vec2 v_TexCoords;\n" +
+"void main() {\n" +
+// '  gl_Position = u_ProjMatrix * u_ViewMatrix * u_ModelMatrix * a_Position;\n' +
+"  gl_Position = u_MVPMatrix * u_ModelMatrix * a_Position;\n" +
+"  if(u_isLighting)\n" +
+"  {\n" +
+"	v_Position = vec3(u_ModelMatrix * a_Position);\n" +
+
+"	v_Normal = normalize(vec3(u_NormalMatrix * a_Normal));\n" +
+" 	v_Color = a_Color;\n" + "  }\n" +
+"  else\n" +
+"  {\n" +
+"     v_Color = a_Color;\n" +
+"  }\n" +
+"  v_TexCoords = a_TexCoords;\n" +
+"}\n";
+// Fragment shader program for point light
+let FSHADER_SOURCE_POINT =
+"#ifdef GL_ES\n" +
+"precision mediump float;\n" +
+"#endif\n" +
+"uniform bool u_UseTextures;\n" +    // Texture enable/disable flag
+"uniform vec3 u_LightColor;\n" +	// light colour
+"uniform vec3 u_LightPosition;\n" +	// position of the light source
+"uniform vec3 u_AmbientLight;\n" + 	// ambient light colour
+"varying vec3 v_Normal;\n" +
+"varying vec3 v_Position;\n" +
+"varying vec4 v_Color;\n" +
+"uniform sampler2D u_Sampler;\n" +
+"varying vec2 v_TexCoords;\n" +
+"void main() {\n" +
+// Normalize normal because it's interpolated and not 1.0 (length)
+"	vec3 normal = normalize(v_Normal);\n" +
+// Calculate the light direction and make it 1.0 in length
+"	vec3 lightDirection = normalize(u_LightPosition - v_Position);\n" +
+// The dot product of the light direction and the normal
+"	float nDotL = max(dot(lightDirection,normal),0.0);\n" +
+// Calculate the final color from diffuse and ambient reflection
+"	vec3 ambient = u_AmbientLight * v_Color.rgb;\n" +
+"  vec3 diffuse;\n" +
+"  if (u_UseTextures) {\n" +
+// '     vec4 TexColor = texture2D(u_Sampler, v_TexCoords);\n' +
+// '     diffuse = u_LightColor * TexColor.rgb * nDotL * 1.2;\n' +
+"     diffuse = u_LightColor.rgb * nDotL * 1.2;\n" +
+"  	  gl_FragColor = vec4(diffuse + ambient, v_Color.a) * texture2D( u_Sampler, v_TexCoords );\n" +
+"  } else {\n" +
+// "	vec3 diffuse = u_LightColor * v_Color.rgb * nDotL;\n"+
+"	vec3 diffuse = u_LightColor.rgb * vec3(0.8,0.8,0.8) * nDotL;\n" +
+"  gl_FragColor = vec4(diffuse + ambient, v_Color.a);\n" +
+"  }\n" +
+
+"}\n";
+
+
+// Fragment shader program for cell shading
+let FSHADER_SOURCE_TOON =
+"#ifdef GL_ES\n" +
+"precision mediump float;\n" +
+"#endif\n" +
+"uniform bool u_UseTextures;\n" +    // Texture enable/disable flag
+"uniform vec3 u_LightColor;\n" +	// light colour
+"uniform vec3 u_LightPosition;\n" +	// position of the light source
+"uniform vec3 u_AmbientLight;\n" + 	// ambient light colour
+"varying vec3 v_Normal;\n" +
+"varying vec3 v_Position;\n" +
+"varying vec4 v_Color;\n" +
+"uniform sampler2D u_Sampler;\n" +
+"varying vec2 v_TexCoords;\n" +
+"void main() {\n" +
+// Normalize normal because it's interpolated and not 1.0 (length)
+" const float A = 0.1;\n" +
+" const float B = 0.3;\n" +
+" const float C = 0.5;\n" +
+" const float D = 0.8;\n" +
+" const float F = 1.0;\n" +
+
+"	vec3 normal = normalize(v_Normal);\n" +
+// Calculate the light direction and make it 1.0 in length
+"	vec3 lightDirection = normalize(u_LightPosition - v_Position);\n" +
+// The dot product of the light direction and the normal
+"	float nDotL = max(dot(lightDirection,normal),0.0);\n" +
+"	vec3 ambient = u_AmbientLight * v_Color.rgb;\n" +
+
+
+"if (nDotL < A) nDotL = 0.0;\n" +
+"else if (nDotL < B) nDotL = B;\n" +
+"else if (nDotL < C) nDotL = C;\n" +
+"else if (nDotL < D) nDotL = D;\n" +
+"else nDotL = F;\n" +
+
+" vec3 E = vec3(0, 0, 1);\n" +
+" vec3 H = normalize(nDotL + E);\n" +
+
+"  vec3 diffuse;\n" +
+// The dot product of the H value and the normal
+"	float nDotH = max(dot(H,normal),0.0);\n" +
+"  if (u_UseTextures) {\n" +
+// '     vec4 TexColor = texture2D(u_Sampler, v_TexCoords);\n' +
+// '     diffuse = u_LightColor * TexColor.rgb * nDotL * 1.2;\n' +
+"     diffuse = u_LightColor.rgb * nDotL * 1.2;\n" +
+"  	  gl_FragColor = vec4(diffuse + ambient, v_Color.a) * texture2D( u_Sampler, v_TexCoords );\n" +
+"  } else {\n" +
+// "	vec3 diffuse = u_LightColor * v_Color.rgb * nDotL;\n"+
+"	vec3 diffuse = u_LightColor.rgb * vec3(0.8,0.8,0.8) * nDotL;\n" +
+"  gl_FragColor = vec4(diffuse + ambient, v_Color.a);\n" +
+"  }\n" +
+"}\n";
+
+// #endregion shaders
 class Scene {
 
+	/**
+	 * Scene Constructor
+	 * Initialises scene, through setting up webgl and lighting
+	 * @param {WebGLContext} gl The gl element in the html page
+	 * @param {HTMLElement} canvas The canvas present in the html page
+	 */
 	constructor (gl,canvas) {
 
 		this.gl = gl;
 		this.canvas = canvas;
-
-		// region shaders
-		// point light per fragment
-		let VSHADER_SOURCE =
-		"#ifdef GL_ES\n" +
-		"precision mediump float;\n" +
-		"#endif\n" +
-		"attribute vec4 a_Position;\n" +
-		"attribute vec4 a_Color;\n" +
-		"attribute vec4 a_Normal;\n" +        // Normal
-		"attribute vec2 a_TexCoords;\n" +
-		"uniform mat4 u_ModelMatrix;\n" +
-		"uniform mat4 u_NormalMatrix;\n" +
-		// 'uniform mat4 u_ViewMatrix;\n' +
-		"uniform mat4 u_MVPMatrix;\n" +
-		// 'uniform mat4 u_ProjMatrix;\n' +
-		"uniform vec3 u_LightColor;\n" +     // Light color
-		"uniform vec3 u_LightPosition;\n" + // Light direction (in the world coordinate, normalized)
-		"uniform vec3 u_AmbientLight;\n" +
-		"uniform bool u_isLighting;\n" +
-		"varying vec4 v_Color;\n" +
-		"varying vec3 v_Normal;\n" +
-		"varying vec3 v_Position;\n" +
-		"varying vec2 v_TexCoords;\n" +
-		"void main() {\n" +
-		// '  gl_Position = u_ProjMatrix * u_ViewMatrix * u_ModelMatrix * a_Position;\n' +
-		"  gl_Position = u_MVPMatrix * u_ModelMatrix * a_Position;\n" +
-		"  if(u_isLighting)\n" +
-		"  {\n" +
-		"	v_Position = vec3(u_ModelMatrix * a_Position);\n" +
-
-		"	v_Normal = normalize(vec3(u_NormalMatrix * a_Normal));\n" +
-		" 	v_Color = a_Color;\n" + "  }\n" +
-		"  else\n" +
-		"  {\n" +
-		"     v_Color = a_Color;\n" +
-		"  }\n" +
-		"  v_TexCoords = a_TexCoords;\n" +
-		"}\n";
-		// Fragment shader program for point light
-		let FSHADER_SOURCE =
-		"#ifdef GL_ES\n" +
-		"precision mediump float;\n" +
-		"#endif\n" +
-		"uniform bool u_UseTextures;\n" +    // Texture enable/disable flag
-		"uniform vec3 u_LightColor;\n" +	// light colour
-		"uniform vec3 u_LightPosition;\n" +	// position of the light source
-		"uniform vec3 u_AmbientLight;\n" + 	// ambient light colour
-		"varying vec3 v_Normal;\n" +
-		"varying vec3 v_Position;\n" +
-		"varying vec4 v_Color;\n" +
-		"uniform sampler2D u_Sampler;\n" +
-		"varying vec2 v_TexCoords;\n" +
-		"void main() {\n" +
-		// Normalize normal because it's interpolated and not 1.0 (length)
-		"	vec3 normal = normalize(v_Normal);\n" +
-		// Calculate the light direction and make it 1.0 in length
-		"	vec3 lightDirection = normalize(u_LightPosition - v_Position);\n" +
-		// The dot product of the light direction and the normal
-		"	float nDotL = max(dot(lightDirection,normal),0.0);\n" +
-		// Calculate the final color from diffuse and ambient reflection
-		"	vec3 ambient = u_AmbientLight * v_Color.rgb;\n" +
-		"  vec3 diffuse;\n" +
-		"  if (u_UseTextures) {\n" +
-		// '     vec4 TexColor = texture2D(u_Sampler, v_TexCoords);\n' +
-		// '     diffuse = u_LightColor * TexColor.rgb * nDotL * 1.2;\n' +
-		"     diffuse = u_LightColor.rgb * nDotL * 1.2;\n" +
-		"  	  gl_FragColor = vec4(diffuse + ambient, v_Color.a) * texture2D( u_Sampler, v_TexCoords );\n" +
-		"  } else {\n" +
-		// "	vec3 diffuse = u_LightColor * v_Color.rgb * nDotL;\n"+
-		"	vec3 diffuse = u_LightColor.rgb * vec3(0.8,0.8,0.8) * nDotL;\n" +
-		"  gl_FragColor = vec4(diffuse + ambient, v_Color.a);\n" +
-		"  }\n" +
-
-		"}\n";
-
-
-		// // Fragment shader program for cell shading
-		// var FSHADER_SOURCE =
-		// '#ifdef GL_ES\n' +
-		// 'precision mediump float;\n' +
-		// '#endif\n' +
-		// 'uniform vec3 u_LightColor;\n' +	//light colour
-		// "uniform vec3 u_LightPosition;\n"+	//position of the light source
-		// "uniform vec3 u_AmbientLight;\n" + 	//ambient light colour
-		// 'varying vec3 v_Normal;\n' +
-		// 'varying vec3 v_Position;\n' +
-		// 'varying vec4 v_Color;\n' +
-		// 'void main() {\n' +
-		// // Normalize normal because it's interpolated and not 1.0 (length)
-		// " const float A = 0.1;\n"+
-		// " const float B = 0.3;\n"+
-		// " const float C = 0.6;\n"+
-		// " const float D = 1.0;\n"+
-
-		// "	vec3 normal = normalize(v_Normal);\n"+
-		// // Calculate the light direction and make it 1.0 in length
-		// "	vec3 lightDirection = normalize(u_LightPosition - v_Position);\n"+
-		// // The dot product of the light direction and the normal
-		// "	float nDotL = max(dot(lightDirection,normal),0.0);\n"+
-		// "if (nDotL < A) nDotL = 0.0;\n"+
-		// "else if (nDotL < B) nDotL = B;\n"+
-		// "else if (nDotL < C) nDotL = C;\n"+
-		// "else nDotL = D;\n"+
-
-		// " vec3 E = vec3(0, 0, 1);\n"+
-		// " vec3 H = normalize(nDotL + E);\n"+
-
-		// // The dot product of the H value and the normal
-		// "	float nDotH = max(dot(H,normal),0.0);\n"+
-		// // Calculate the final color from diffuse and ambient reflection
-		// "	vec3 diffuse = u_LightColor * v_Color.rgb * nDotL;\n"+
-		// "	vec3 ambient = u_AmbientLight * v_Color.rgb;\n"+
-		// '  gl_FragColor = vec4(diffuse * (ambient+nDotL), v_Color.a);\n' +
-		// '}\n';
-
-
+		this.vertexShaders = [VSHADER_SOURCE_DEFAULT];
+		this.fragmentShaders = [FSHADER_SOURCE_POINT,FSHADER_SOURCE_TOON];
+		this.activeVS = 0;
+		this.activeFS = 1;
 		// Initialize shaders
-		if (!initShaders(this.gl, VSHADER_SOURCE, FSHADER_SOURCE)) {
+
+		if (!this.changeShader()) {
 
 			console.log("Failed to intialize shaders.");
 			return;
 
 		}
 
-		// #endregion shaders
-
+		// initialise matrices and program
 		this.program = this.gl.program;
 		this.viewMatrix = new Matrix4();  // The view matrix
 		this.projMatrix = new Matrix4();  // The projection matrix
@@ -146,6 +172,77 @@ class Scene {
 
 		// Clear color and depth buffer
 		this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+		this.getShaderLocations();
+
+		this.lightScalar = 0.6;
+		// set the light colour for flickering light
+		this.gl.uniform3f(this.program.u_LightColor, 1 * this.lightScalar, 1 * this.lightScalar, 1 * this.lightScalar);
+
+		// Calculate the view matrix and the projection matrix
+		// Multiply them and pass through to shader program - Acts as precalculation to save work on shader prorgam
+
+		this.eye = new Eye(1.1,4,10);
+
+		this.viewMatrix.setLookAt(this.eye.x, this.eye.y, this.eye.z, 0, 0, 0, 0, 1.0, 0.0);
+		this.projMatrix.setPerspective(90, this.canvas.width / this.canvas.height, 1, 100);
+
+		this.mvpMatrix.set(this.projMatrix).multiply(this.viewMatrix);
+
+		this.gl.uniformMatrix4fv(this.program.u_MVPMatrix, false, this.mvpMatrix.elements);
+
+		// depth of camera value
+		this.depth = -25;
+
+	}
+	/**
+	 * Initialises the scene with the vertex shader and fragment shader provided by the active values
+	 * Adapted from lib/initShaders.js
+	 * @returns {Boolean} success on whether the new shader has loaded
+	 */
+	changeShader () {
+
+		// load both shaders
+		this.vertexShader = loadShader(this.gl, this.gl.VERTEX_SHADER, this.vertexShaders[this.activeVS]);
+		this.fragmentShader = loadShader(this.gl, this.gl.FRAGMENT_SHADER, this.fragmentShaders[this.activeFS]);
+		// Create a program object
+		let program = this.gl.createProgram();
+		if (!program) {
+
+			return null;
+
+		}
+
+		// Attach the shader object
+		this.gl.attachShader(program, this.vertexShader);
+		this.gl.attachShader(program, this.fragmentShader);
+
+		// Link the program object
+		this.gl.linkProgram(program);
+
+		// Check the result of linking
+		let linked = this.gl.getProgramParameter(program, this.gl.LINK_STATUS);
+		if (!linked) {
+
+			let error = this.gl.getProgramInfoLog(program);
+			console.log("Failed to link program: " + error);
+			this.gl.deleteProgram(program);
+			this.gl.deleteShader(this.fragmentShader);
+			this.gl.deleteShader(this.vertexShader);
+			return null;
+
+		}
+		this.gl.useProgram(program);
+		this.gl.program = program;
+		this.program = program;
+		return true;
+
+	}
+	/**
+	 * Assigns the shader variable locations to the current program
+	 * Used when changing and initialising shader variables
+	 * @returns {null} No return value
+	 */
+	getShaderLocations () {
 
 		// Get the storage locations of uniform attributes
 
@@ -169,14 +266,14 @@ class Scene {
 			return;
 
 		}
-		this.program.u_Sampler = gl.getUniformLocation(this.program, "u_Sampler");
+		this.program.u_Sampler = this.gl.getUniformLocation(this.program, "u_Sampler");
 		if (!this.program.u_Sampler) {
 
 			console.log("Failed to get the storage location of u_Sampler");
 			return false;
 
 		}
-		this.program.u_UseTextures = gl.getUniformLocation(this.program, "u_UseTextures");
+		this.program.u_UseTextures = this.gl.getUniformLocation(this.program, "u_UseTextures");
 		if (!this.program.u_UseTextures) {
 
 			console.log("Failed to get the storage location for texture map enable flag");
@@ -184,35 +281,25 @@ class Scene {
 
 		}
 
-		// Set the light color (white)
-		// this.gl.uniform3f(this.program.u_LightColor, 1, 1, 1);
-		// this.gl.uniform4f(this.program.u_LightColor, 1, 1, 1, 1);
-		this.lightScalar = 0.6;
-		this.gl.uniform3f(this.program.u_LightColor, 1 * this.lightScalar, 1 * this.lightScalar, 1 * this.lightScalar);
-		// this.gl.uniform3f(this.program.u_AmbientLight, 0.2, 0.2, 0.2);
-		this.gl.uniform3f(this.program.u_AmbientLight,0.01, 0.01, 0.01);
+		// Initialise ambient light to be low to emphasise the flickering light - on click of L
+		this.gl.uniform3f(this.program.u_AmbientLight,0.05, 0.05, 0.05);
+
+		// Set default lighting boolean and position
 		this.lightPosition = new Vector3([0,10,0]);
 		this.gl.uniform3f(this.program.u_LightPosition, this.lightPosition.elements[0],this.lightPosition.elements[1], this.lightPosition.elements[2]);
-
-		// Calculate the view matrix and the projection matrix
-
-		this.eye = new Eye(1.1,4,10);
-
-		this.viewMatrix.setLookAt(this.eye.x, this.eye.y, this.eye.z, 0, 0, 0, 0, 1.0, 0.0);
-		this.projMatrix.setPerspective(90, this.canvas.width / this.canvas.height, 1, 100);
-
-		this.mvpMatrix.set(this.projMatrix).multiply(this.viewMatrix);
-
-		// Pass the model, view, and projection matrix to the uniform variable respectively
-		// this.gl.uniformMatrix4fv(this.program.u_ViewMatrix, false, this.viewMatrix.elements);
-		// this.gl.uniformMatrix4fv(this.program.u_ProjMatrix, false, this.projMatrix.elements);
-		this.gl.uniformMatrix4fv(this.program.u_MVPMatrix, false, this.mvpMatrix.elements);
-
-
 		this.gl.uniform1i(this.program.u_isLighting, true); // Will apply lighting
-		this.depth = -25;
 
 	}
+
+	/**
+	 * Push a new model into the array of models present in the Scene
+	 * @param {String} name Name of the object - if primitive == 0, then this needs to be the same as the endpoint for the obj file
+	 * @param {Number} primitive when 1 object is based on default cube, when 0 the object requests an obj, when 2, the object has no mesh, only a modelmatrix and Transforms
+	 * @param {Texture} texture A texture object for the model - can be changed after instantiation
+	 * @param {Vector3} pos The starting positon of the object
+	 * @param {Vector3} scale Starting scale of the object
+	 * @returns {Model} Returns the model instantiated
+	 */
 	newModel (name,primitive,texture, pos, scale) {
 
 		let model = new Model({"filename":name,"gl":this.gl,"program":this.program, "pos": pos, "scale":scale,"primitive": primitive,"texture":texture});
@@ -221,6 +308,12 @@ class Scene {
 		return model;
 
 	}
+	/**
+	 * Runs the draw function every frame
+	 * This binds the buffers for every object and draws its corresponding elements
+	 * The default cube requires a different type to that used by the obj
+	 * @returns {null} No return value for function
+	 */
 	draw () {
 
 		this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
@@ -243,11 +336,17 @@ class Scene {
 			}
 
 		}
-
+		// updates the new light position and light colour to the shader program
 		this.gl.uniform3f(this.program.u_LightPosition, this.lightPosition.elements[0],this.lightPosition.elements[1], this.lightPosition.elements[2]);
 		this.gl.uniform3f(this.program.u_LightColor, 1 * this.lightScalar, 1 * this.lightScalar, 1 * this.lightScalar);
 
 	}
+	/**
+	 * Updates the position/ rotation of the camera based on the provided key presses
+	 * Also updates the VP matrix where appropriate
+	 * @param {Number} deltaTime The time elapsed since the function was last run
+	 * @returns {null} No value is returned
+	 */
 	updateCamera (deltaTime) {
 
 		this.rate = deltaTime;
@@ -255,13 +354,14 @@ class Scene {
 		if (keypressed["37"] == true) {
 
 			// "left arrow pressed"
+			// rotate left
 			this.eye.y += this.rate;
 
 		}
 		if(keypressed["38"] == true) {
 
 			// "up arrow clicked"
-			// this.eye.x+=this.rate/60;
+			// rotate up
 			temp = this.eye.x + this.rate;
 			if (temp > 1.1) {
 
@@ -278,13 +378,14 @@ class Scene {
 		if (keypressed["39"] == true) {
 
 			// "right arrow clicked"
+			// rotate right
 			this.eye.y -= this.rate;
 
 		}
 		if (keypressed["40"] == true) {
 
 			// "down arrow clicked"
-			// this.eye.x-=this.rate/60;
+			// rotate down
 
 			temp = this.eye.x - this.rate;
 			// if (temp<-0.35){
@@ -304,6 +405,8 @@ class Scene {
 		}
 		if (keypressed["87"] == true) {
 
+			// w clicked
+			// move closer to the center
 			temp = this.depth + this.rate * 10;
 			if (temp > -10) {
 
@@ -319,6 +422,8 @@ class Scene {
 		}
 		if (keypressed["83"] == true) {
 
+			// s clicked
+			// move further away from center
 			temp = this.depth - this.rate * 10;
 			if (temp < -45) {
 
@@ -333,14 +438,12 @@ class Scene {
 
 		}
 
-
+		// rotate and translate the view matrix appropriately
 		this.viewMatrix = new Matrix4().setIdentity();
 
 		mat4.translate(this.viewMatrix.elements,this.viewMatrix.elements, vec3.fromValues(0,0,this.depth));
 		mat4.rotateX(this.viewMatrix.elements,this.viewMatrix.elements, this.eye.x);
 		mat4.rotateY(this.viewMatrix.elements,this.viewMatrix.elements, this.eye.y);
-
-		// this.gl.uniformMatrix4fv(this.program.u_ViewMatrix, false, this.viewMatrix.elements);
 
 		this.mvpMatrix.set(this.projMatrix).multiply(this.viewMatrix);
 
@@ -354,14 +457,24 @@ class Scene {
 
 class Model {
 
-
+	/**
+	 * Instantiates a new model/ object
+	 * @param {String} filename Filename provided if looking for obj, else can be unique for object
+	 * @param {WebGLContext} gl The gl element in the html page
+	 * @param {program} program The current program being used to render the scene
+	 * @param {Vector3} pos The starting position of an object
+	 * @param {Vectro3} scale The starting scale of an object
+	 * @param {Vector3} rot The starting rotation of an object
+	 * @param {Number} primitive The integer used when When 1 object is based on default cube,
+	 * 							when 0 the object requests an obj, when 2, the object has no mesh, only a modelmatrix and Transforms
+	 */
 	constructor ({filename,gl,program, pos, scale, rot, primitive}) {
 
 		this.name = filename;
 
 		this.textures = [];
 		this.activeTexture = 0;
-		// Coordinate transformation matrix
+		// Initialise coordinate transformation matrices
 		this.modelMatrix = new Matrix4();
 		this.position = new Vector3([0,0,0]);
 		this.scale = new Vector3([1,1,1]);
@@ -373,22 +486,25 @@ class Model {
 		this.primitive = primitive;
 		if (this.primitive < 2) {
 
+			// for every object with a mesh init buffers and generate starting normal matrix
 			this.normalMatrix = new Matrix4();
 			this.initVertexBuffers(gl,program);
 			if (this.primitive == 0) {
 
+				// if required, read the obj
 				readOBJFile(this.name,gl,program,this,1,0);
 
 			}
 			else{
 
+				// else use default cube
 				this.initCube();
 
 			}
 
 		}
+		// set default transforms
 		this.modelMatrix.setTranslate(0,0,0);
-
 
 		if (pos) {
 
@@ -418,22 +534,27 @@ class Model {
 
 		}
 
-
 		this.children = [];
-		this.dampening = 8;
-		this.prevAngle = 0;
-
 
 	}
-
+	/**
+	 * @param {Model} model The model to push into the children array - to produce heirarchy
+	 * @returns {null} No return value
+	 */
 	addChild (model) {
 
 		this.children.push(model);
 
 	}
-
+	/**
+	 * Iterates through each child, resets its model matrix based on Transforms
+	 * Multiplies its model matrix by its parent's model matrix
+	 * Then recursively updates that objects children
+	 * @returns {null} No return value
+	 */
 	updateChildren () {
 
+		// this doesn't fully work
 		for (let i = 0;i < this.children.length;i++) {
 
 
@@ -445,7 +566,11 @@ class Model {
 		}
 
 	}
-
+	/**
+	 * Updates the objects scale, then updates the objects model matrix by the Vector3 given
+	 * @param {Vector3} scale The scale to adjust the object by
+	 * @returns {null} No return value
+	 */
 	updateScale (scale) {
 
 		this.scale.elements[0] *= scale.elements[0];
@@ -454,7 +579,11 @@ class Model {
 		this.updateModelMatrix();
 
 	}
-
+	/**
+	 * Updates the objects position, then updates the objects model matrix by the Vector3 given
+	 * @param {Vector3} pos The position to translate the object by
+	 * @returns {null} No return value
+	 */
 	updatePos (pos) {
 
 		this.position.elements[0] += pos.elements[0];
@@ -463,6 +592,11 @@ class Model {
 		this.updateModelMatrix();
 
 	}
+	/**
+	 * Updates the objects rotation, then updates the objects model matrix by the Vector3 given
+	 * @param {Vector3} rot The difference in rotation to the current rotation
+	 * @returns {null} No return value
+	 */
 	updateRot (rot) {
 
 		this.rotation.elements[0] += rot.elements[0];
@@ -471,9 +605,21 @@ class Model {
 		this.updateModelMatrix();
 
 	}
+	/**
+	 * Resets the model matrix to the identity matrix
+	 * Then translates, scales and rotates the object based on the objects Transform values
+	 * @returns {null} No return value
+	 */
 	updateModelMatrix () {
 
 		this.modelMatrix = this.modelMatrix.setIdentity();
+
+
+		// this.modelMatrix.setRotate(this.rotation.elements[1],0,1,0);
+		// this.modelMatrix.setRotate(this.rotation.elements[0],1,0,0);
+		// this.modelMatrix.setRotate(this.rotation.elements[2],0,0,1);
+
+
 		this.modelMatrix.translate(this.position.elements[0],this.position.elements[1],this.position.elements[2]);
 
 
@@ -487,6 +633,10 @@ class Model {
 		this.updateChildren();
 
 	}
+	/**
+	 * Outputs the objects current Transforms to the console
+	 * @returns {null} No return value
+	 */
 	printTransform () {
 
 		console.log(this.name);
@@ -498,47 +648,14 @@ class Model {
 		console.log(this.rotation);
 
 	}
-
-	SHM (posX,posY, dampeningRate) {
-
-		// var angle = Math.atan(this.modelMatrix.elements[13]/this.modelMatrix.elements[12]);
-
-		// // console.log(this.name)
-		// // console.log(angle*180/Math.PI)
-		// angle = angle
-		// // this.modelMatrix.rotate(this.prevAngle - angle,0,0,1);
-		// this.modelMatrix.rotate(angle,0,0,1);
-
-		this.modelMatrix.translate(posX / this.dampening,posY / this.dampening,0);
-
-		// this.modelMatrix.translate(posX/this.dampening,0,0);
-
-
-		// this.modelMatrix.rotat
-
-		// this.modelMatrix.lookAt(this.modelMatrix.elements[12],this.modelMatrix.elements[13],this.modelMatrix.elements[14],0,0,0,0,1,0)
-		for(let i = 0;i < this.children.length;i++) {
-
-			this.children[i].SHM(posX * dampeningRate, posY * dampeningRate, dampeningRate);
-
-		}
-
-		this.prevAngle = angle;
-		/*
-
-		tan-1 (xDisplacement/Height)
-
-
-		|\
-		| \
-		|  \
-		|   \
-		 ----
-
-		*/
-
-	}
-
+	/**
+	 * Initialises the array buffers for each object, needs to occur every frame
+	 * @param {WebGLContext} gl The gl element in the html page
+	 * @param {ShaderLocation} a_attribute The attribute to initiate a buffer for
+	 * @param {Number} num The size of each element in the buffer
+	 * @param {DataType} type The data type for the buffer
+	 * @returns {null} No return value
+	 */
 	createEmptyArrayBuffer (gl, a_attribute, num, type) {
 
 		let buffer = gl.createBuffer();
@@ -549,15 +666,18 @@ class Model {
 
 		}
 		gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
-		// var FSIZE = this.drawingInfo.vertices.BYTES_PER_ELEMENT;
-		// gl.vertexAttribPointer(a_attribute,num,type,false,FSIZE *num,0);
 
 		gl.vertexAttribPointer(a_attribute,num,type,false,0,0);
 		gl.enableVertexAttribArray(a_attribute);
 		return buffer;
 
 	}
-
+	/**
+	 * Initialises object buffers for position, normal, colour,indices and texture coordinates
+	 * @param {WebGLContext} gl The gl element in the html page
+	 * @param {program} program The current program being used to render the scene
+	 * @returns {null} No return value
+	 */
 	initVertexBuffers (gl,program) {
 
 		this.vertexBuffer = this.createEmptyArrayBuffer(gl,program.a_Position,3,gl.FLOAT);
@@ -587,6 +707,13 @@ class Model {
 
 	}
 
+	/**
+	 * First initialises the buffers for the object
+	 * Then binds each attribute to the buffer and then draws the elements (after this function finishes - in Scene.draw())
+	 * @param {WebGLContext} gl The gl element in the html page
+	 * @param {program} program The current program being used to render the scene
+	 * @returns {null} No return value
+	 */
 	bindBuffers (gl,program) {
 
 		// get drawing info
@@ -610,6 +737,7 @@ class Model {
 			gl.uniform1i(program.u_UseTextures, false);
 
 		}
+
 
 		// Write data into the buffer object
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
@@ -640,12 +768,19 @@ class Model {
 		gl.uniformMatrix4fv(program.u_ModelMatrix, false, this.modelMatrix.elements);
 
 	}
+	/**
+	 * Moves through the textures available for the object in a cyclic manner
+	 * @returns {null} No return value
+	 */
 	changeTexture () {
 
 		this.activeTexture = (this.activeTexture + 1) % this.textures.length;
 
 	}
-
+	/**
+	 * Initialises cube primitive drawing info data
+	 * @returns {DrawingInfo} Containing the drawing info for the primitive cube
+	 */
 	initCube () {
 
 		// Create a cube
@@ -718,7 +853,19 @@ class Model {
 
 // #region obj importing
 
-
+/**
+ * Runs a HTTP GET request to my express server
+ * When the file has arrived, parse the object file
+ * When the object file has been parsed,
+ * set the objects drawing info to that found in the obj
+ * @param {String} fileName Endpoint for obj to load
+ * @param {WebGLContext} gl The gl element in the html page
+ * @param {program} program The current program being used to render the scene
+ * @param {Model} model The model object to link with the requested obj file
+ * @param {Number} scale The starting scale of an object
+ * @param {Boolean} reverse Whether the object is inverted - flipping all normals
+ * @returns {null} No return value
+ */
 function readOBJFile (fileName, gl,program, model, scale, reverse) {
 
 	let request = new XMLHttpRequest();
@@ -731,7 +878,6 @@ function readOBJFile (fileName, gl,program, model, scale, reverse) {
 
 					model.objdoc = objDoc;
 					model.drawingInfo = model.objdoc.getDrawingInfo();
-					model.read = true;
 					console.log("loaded");
 					// model.onReadComplete(gl,program);
 					// model.draw(gl,program);
@@ -747,6 +893,14 @@ function readOBJFile (fileName, gl,program, model, scale, reverse) {
 
 }
 
+/**
+ * Async function starting the parse of the file
+ * @param {String} fileString Contents of the obj file
+ * @param {String} fileName Name of the obj file
+ * @param {Number} scale Scale of the obj
+ * @param {Boolean} reverse Whether the object is inverted - flipping all normals
+ * @returns {objDoc} The object data found from the obj file or NULL if failure occurs
+ */
 async function onReadOBJFile (fileString, fileName, scale, reverse) {
 
 	try{
@@ -773,6 +927,10 @@ async function onReadOBJFile (fileString, fileName, scale, reverse) {
 
 class objDoc {
 
+	/**
+	 * Initialises the objDoc arrays
+	 * @param {String} fileName The name of the file's obj
+	 */
 	constructor (fileName) {
 
 		this.fileName = fileName;
@@ -783,6 +941,13 @@ class objDoc {
 		this.vertexTextures = Array(0);
 
 	}
+	/**
+	 *
+	 * @param {String} fileString Contents of the obj
+	 * @param {Number} scale Scale to adjust model by
+	 * @param {Boolean} reverseNormal Whether to reverse the normals
+	 * @returns {Boolean} On success of parsing
+	 */
 	parse (fileString, scale, reverseNormal) {
 
 		let lines = fileString.split("\n");
@@ -806,11 +971,14 @@ class objDoc {
 		let normal;
 
 		let face;
+
+		// loop through line adding found attributes to this.attribute
 		while ((line = lines[index++]) != null) {
 
 			let words = line.split(" ");
 			if (words[0] == null || words[0] == "#") {
 
+				// skip comments and blank lines
 				continue;
 
 			}
@@ -829,11 +997,13 @@ class objDoc {
 					objectName = objectName + words[i];
 
 				}
+				// new object found - if obj contains multiple objects
 				object = new OBJObject(objectName);
 				this.objects.push(object);
 				currentObject = object;
 				continue;
 			case "v":
+				// adds a vertex and its coordinates
 				x = words[1] * scale;
 				y = words[2] * scale;
 				z = words[3] * scale;
@@ -841,6 +1011,7 @@ class objDoc {
 				this.vertices.push(vertex);
 				continue;
 			case "vt":
+				// add vertex texture coordinates
 				u = words[1];
 				v = words[2];
 				// ignore depth
@@ -848,6 +1019,7 @@ class objDoc {
 				this.vertexTextures.push(textCoord);
 				continue;
 			case "vn":
+				// vertex normals
 				x = words[1];
 				y = words[2];
 				z = words[3];
@@ -855,6 +1027,7 @@ class objDoc {
 				this.normals.push(normal);
 				continue;
 			case "f":
+				// new face
 				face = this.parseFace(words,reverseNormal);
 				currentObject.addFace(face);
 				continue;
@@ -865,9 +1038,17 @@ class objDoc {
 		return true;
 
 	}
+	/**
+	 * Generate a face object based on the attributes for the line
+	 * @param {Array} words The string of the line the data is found on
+	 * @param {Boolean} reverse Whether to reverse the normals
+	 * @returns {Face} returns the generated face object
+	 */
 	parseFace (words,reverse) {
 
 		let face = new Face();
+		// loop through given indices for the face
+		// format v/vt/vn
 		for (let i = 1; i < words.length;i++) {
 
 			let word = words[i];
@@ -898,12 +1079,6 @@ class objDoc {
 			}
 
 		}
-
-		// if (face.texIndices.length == face.vIndices.length){
-		// 	for (let i=0;i<face.vIndices.length;i++){
-		// 		this.vertices[face.texIndices]
-		// 	}
-		// }
 
 		// calc normal
 		let v0 = [
@@ -967,6 +1142,7 @@ class objDoc {
 				newNIndices[i * 3 + 0] = face.nIndices[0];
 				newNIndices[i * 3 + 1] = face.nIndices[i + 1];
 				newNIndices[i * 3 + 2] = face.nIndices[i + 2];
+				// added Vertex texture coordinate devide for faces over 3 points
 				newVTIndices[i * 3 + 0] = face.texIndices[0];
 				newVTIndices[i * 3 + 1] = face.texIndices[i + 1];
 				newVTIndices[i * 3 + 2] = face.texIndices[i + 2];
@@ -974,6 +1150,7 @@ class objDoc {
 			}
 			face.vIndices = newVIndices;
 			face.nIndices = newNIndices;
+			// push the new indices
 			face.texIndices = newVTIndices;
 
 		}
@@ -1022,13 +1199,7 @@ class objDoc {
 					vertices[index_indices * 3 + 1] = vertex.y;
 					vertices[index_indices * 3 + 2] = vertex.z;
 
-					// vertex Texture Info
-					// if (this.vertexTextures[vIdx]){
-					// 	var vertexText = this.vertexTextures[vIdx];
-					// 	textCoords[index_indices * 2 + 0] = vertexText.u;
-					// 	textCoords[index_indices * 2 + 1] = vertexText.v;
-					// }
-
+					// Sort vertext texture coordinates out for each vertex
 					let tIdx = face.texIndices[k];
 					let vertexText = this.vertexTextures[tIdx];
 					textCoords[index_indices * 2 + 0] = vertexText.U;
@@ -1065,6 +1236,13 @@ class objDoc {
 		return new DrawingInfo(vertices, normals, colors, indices, textCoords);
 
 	}
+	/**
+	 * Used for material parsing
+	 * Therefore not used in this project
+	 * Gives the object a default colour when no material is provided
+	 * @param {String} name Name of the material
+	 * @returns {Colour} returns a colour object to colour the model with
+	 */
 	findColor (name) {
 
 		if (name) {
@@ -1099,6 +1277,11 @@ class objDoc {
 
 class Texture {
 
+	/**
+	 * Initialises the texture Image, and the source endpoint
+	 * @param {String} name name of the texture - the endpoint on the server to get the object
+	 * @param {WebGLContext} gl The gl element in the html page
+	 */
 	constructor (name,gl) {
 
 		this.name = name;
@@ -1108,12 +1291,23 @@ class Texture {
 		this.img.onload = this.onTextureLoad(gl);
 
 	}
+	/**
+	 * Initiates the texture buffer for the current texture
+	 * @param {WebGLContext} gl The gl element in the html page
+	 * @returns {null} No return value
+	 */
 	onTextureLoad (gl) {
 
 		this.textureBuffer = gl.createTexture();
 		this.loaded = true;
 
 	}
+	/**
+	 * Binds the texture to the buffers and sorts out clamping/ mipmap generation respectively
+	 * @param {WebGLContext} gl The gl element in the html page
+	 * @param {program} program The current program being used to render the scene
+	 * @returns {null} No return value
+	 */
 	bindTexture (gl,program) {
 
 		if (this.img) {
@@ -1184,6 +1378,7 @@ class Texture {
 // #region basic classes and common function
 class Vertex {
 
+	// vertex class with usual attributes
 	constructor (x,y,z) {
 
 		this.x = x;
@@ -1195,6 +1390,7 @@ class Vertex {
 }
 class VertexTexture {
 
+	// vertex texture coordinate class with usual attributes
 	constructor (U,V) {
 
 		this.U = U;
@@ -1205,6 +1401,7 @@ class VertexTexture {
 }
 class Eye {
 
+	// The position of the camera
 	constructor (x,y,z) {
 
 		this.x = x;
@@ -1216,6 +1413,7 @@ class Eye {
 }
 class Normal {
 
+	// normal class with usual attributes
 	constructor (x,y,z) {
 
 		this.x = x;
@@ -1227,6 +1425,7 @@ class Normal {
 }
 class Colour {
 
+	// colour class with usual attributes
 	constructor (r,g,b,a) {
 
 		this.r = r;
@@ -1239,6 +1438,8 @@ class Colour {
 }
 class Face {
 
+	// face class for each line in obj
+	// takes and parses the indices for a given face
 	constructor () {
 
 		this.vIndices = new Array(0);
@@ -1250,6 +1451,7 @@ class Face {
 }
 class OBJObject {
 
+	// The obj class containing faces from Face
 	constructor (name) {
 
 		this.name = name;
@@ -1265,8 +1467,10 @@ class OBJObject {
 	}
 
 }
+
 class DrawingInfo {
 
+	// Geometry drawing info - can be used to make new instances of model without pinging server
 	constructor (vertices,normals,colours,indices,textCoords) {
 
 		this.vertices = vertices;
@@ -1278,6 +1482,12 @@ class DrawingInfo {
 	}
 
 }
+/**
+ * Is the given number a power of two
+ * used for mipmap generation
+ * @param {Number} num Number to query
+ * @returns {Boolean} Whether number is a power of two or not
+ */
 function isPower2 (num) {
 
 	if ((num & (num - 1)) == 0) {
@@ -1288,6 +1498,15 @@ function isPower2 (num) {
 	return false;
 
 }
+/**
+ * NOTE: function from textbook
+ * Uses cross product to find the normal of the 2 vectors
+ * vector 0 is p0-p1 vector 1 is p1-p2 vector
+ * @param {*} p0 position 0
+ * @param {*} p1 position 1
+ * @param {*} p2 position 2
+ * @returns {Vector3} a normalised normal of the 3 points provided
+ */
 function calcNormal (p0, p1, p2) {
 
 	// v0: a vector from p1 to p0, v1; a vector from p1 to p2
@@ -1295,8 +1514,8 @@ function calcNormal (p0, p1, p2) {
 	let v1 = new Float32Array(3);
 	for (let i = 0; i < 3; i++) {
 
-	  v0[i] = p0[i] - p1[i];
-	  v1[i] = p2[i] - p1[i];
+		v0[i] = p0[i] - p1[i];
+		v1[i] = p2[i] - p1[i];
 
 	}
 
@@ -1321,19 +1540,30 @@ let deltaTime;
 let startLoadAnimation = false;
 let ranStartAnimation = false;
 let lightAnimation = false;
-let deltaFlash = 3;
+let cushionAnimation = false;
+let chairAnimation = false;
+let cushionTime = 0;
+let chairPosition = 1;
+let deltaFlash;
 let lightMoveAnimation = false;
 let lightTime = 0;
-
-let angle;
+let dirX = 1;
+let dirZ = 1;
+/**
+ * Runs animations and draw functions
+ * @param {Number} currTime The current time elapsed when update is ran
+ * @returns {null} `no return value
+ */
 function update (currTime) {
 
+	// calculates delta time
 	deltaTime = (currTime - lastTime) / 1000;
 
 	if (!ranStartAnimation) {
 
 		if (startLoadAnimation) {
 
+			// moves walls down on spacebar click
 			Scene1.walls.children[0].updateRot(new Vector3([0,0,-deltaTime * 45]));
 			Scene1.walls.children[1].updateRot(new Vector3([deltaTime * 45,0,0]));
 			Scene1.walls.children[2].updateRot(new Vector3([0,0,deltaTime * 45]));
@@ -1348,25 +1578,28 @@ function update (currTime) {
 		}
 
 	}
-
 	if (lightAnimation) {
 
+		// flashes light when l is clicked
 		deltaFlash -= deltaTime;
 		if (deltaFlash < 0)
 		{
-			
+
+			deltaFlash = Math.random();
+			Scene1.lightScalar = Math.random() * (0.6) + 0.1;
+
 		}
 
 	}
 
-
 	if (lightMoveAnimation) {
 
+		// light sways when m is clicked
 
 		lightTime += deltaTime;
 
-		let angle = Math.cos(2 * Math.PI * lightTime) * Math.exp(-lightTime / 4) * 2;
-		Scene1.fitting.updateRot(new Vector3([angle,0,angle]));
+		let angle = Math.cos(2 * Math.PI * lightTime) * Math.exp(-lightTime / 4) * 4;
+		Scene1.fitting.updateRot(new Vector3([angle * dirX,0,angle * dirZ]));
 
 
 		Scene1.lightPosition.elements[0] = Scene1.fitting.children[0].children[0].modelMatrix.elements[12];
@@ -1379,23 +1612,89 @@ function update (currTime) {
 			lightTime = 0;
 			let temp = Scene1.fitting.rotation;
 
-			Scene1.fitting.updateRot(new Vector3([temp.elements[0] * -1,0,temp.elements[2]]));
+			Scene1.fitting.updateRot(new Vector3([temp.elements[0] * -1,0,temp.elements[2] * -1]));
 
 		}
 
 	}
 
+	if (cushionAnimation) {
 
+		// spin cushions and reset after 5 seconds
+		// on their own axis
+		cushionTime += deltaTime;
+		let angle = Math.sin(2 * Math.PI * cushionTime) * 10;
+
+		for (let i = 0;i < Scene1.cushions.length;i++) {
+
+			Scene1.cushions[i].updateRot(new Vector3([angle,0,0]));
+
+		}
+		if (cushionTime > 5) {
+
+			cushionTime = 0;
+			cushionAnimation = false;
+
+			for (let i = 0;i < Scene1.cushions.length;i++) {
+
+				let temp = Scene1.cushions[i].rotation;
+				Scene1.cushions[i].updateRot(new Vector3([-1 * temp.elements[0],0,0]));
+
+			}
+
+		}
+
+	}
+
+	if (chairAnimation) {
+
+		// move chair between two points
+		if (chairPosition == 2) {
+
+			Scene1.chair.updatePos(new Vector3([0,0,deltaTime]));
+			if (Scene1.chair.position.elements[2] > -5.35) {
+
+				Scene1.chair.position.elements[2] = -5.4;
+				chairPosition = 1;
+				chairAnimation = false;
+
+			}
+
+		}
+		if (chairPosition == 1) {
+
+			Scene1.chair.updatePos(new Vector3([0,0,-deltaTime]));
+
+			if (Scene1.chair.position.elements[2] < -7.4) {
+
+				Scene1.chair.position.elements[2] = -7.4;
+				chairPosition = 2;
+				chairAnimation = false;
+
+			}
+
+		}
+
+	}
+
+	// update draw and camera movements
 	Scene1.updateCamera(deltaTime);
 	Scene1.draw();
 
+	// call this function again with animation frame
 	lastTime = currTime;
 	window.requestAnimationFrame(update);
 
 }
 
-
-function printMatrix (mat,name,round) {
+/**
+ * Prints a matrix instance to the console
+ * @param {Matrix4} mat	The matrix to print
+ * @param {String} name	Name of the matrix
+ * @param {Boolean} round Whether the elements should be rounded - to 2dp
+ * @returns {null} No return value
+ */
+function printMatrix (mat,name,round) {	// eslint-disable-line no-unused-vars
 
 	if (name) {
 
@@ -1407,17 +1706,23 @@ function printMatrix (mat,name,round) {
 		console.log("--------------Start  mat4--------------");
 
 	}
+	if (round) {
 
-	// console.log("| "+Math.round(mat.elements[0]*100)/100+", "+Math.round(mat.elements[4]*100)/100+", "+Math.round(mat.elements[8]*100)/100+", "+Math.round(mat.elements[12]*100)/100+" |");
-	// console.log("| "+Math.round(mat.elements[1]*100)/100+", "+Math.round(mat.elements[5]*100)/100+", "+Math.round(mat.elements[9]*100)/100+", "+Math.round(mat.elements[13]*100)/100+" |");
-	// console.log("| "+Math.round(mat.elements[2]*100)/100+", "+Math.round(mat.elements[6]*100)/100+", "+Math.round(mat.elements[10]*100)/100+", "+Math.round(mat.elements[14]*100)/100+" |");
-	// console.log("| "+Math.round(mat.elements[3]*100)/100+", "+Math.round(mat.elements[7]*100)/100+", "+Math.round(mat.elements[11]*100)/100+", "+Math.round(mat.elements[15]*100)/100+" |");
+		console.log("| " + Math.round(mat.elements[0] * 100) / 100 + ", " + Math.round(mat.elements[4] * 100) / 100 + ", " + Math.round(mat.elements[8] * 100) / 100 + ", " + Math.round(mat.elements[12] * 100) / 100 + " |");
+		console.log("| " + Math.round(mat.elements[1] * 100) / 100 + ", " + Math.round(mat.elements[5] * 100) / 100 + ", " + Math.round(mat.elements[9] * 100) / 100 + ", " + Math.round(mat.elements[13] * 100) / 100 + " |");
+		console.log("| " + Math.round(mat.elements[2] * 100) / 100 + ", " + Math.round(mat.elements[6] * 100) / 100 + ", " + Math.round(mat.elements[10] * 100) / 100 + ", " + Math.round(mat.elements[14] * 100) / 100 + " |");
+		console.log("| " + Math.round(mat.elements[3] * 100) / 100 + ", " + Math.round(mat.elements[7] * 100) / 100 + ", " + Math.round(mat.elements[11] * 100) / 100 + ", " + Math.round(mat.elements[15] * 100) / 100 + " |");
 
+	}
+	else{
 
-	console.log("| " + mat.elements[0] + ", " + mat.elements[4] + ", " + mat.elements[8] + ", " + mat.elements[12] + " |");
-	console.log("| " + mat.elements[1] + ", " + mat.elements[5] + ", " + mat.elements[9] + ", " + mat.elements[13] + " |");
-	console.log("| " + mat.elements[2] + ", " + mat.elements[6] + ", " + mat.elements[10] + ", " + mat.elements[14] + " |");
-	console.log("| " + mat.elements[3] + ", " + mat.elements[7] + ", " + mat.elements[11] + ", " + mat.elements[15] + " |");
+		console.log("| " + mat.elements[0] + ", " + mat.elements[4] + ", " + mat.elements[8] + ", " + mat.elements[12] + " |");
+		console.log("| " + mat.elements[1] + ", " + mat.elements[5] + ", " + mat.elements[9] + ", " + mat.elements[13] + " |");
+		console.log("| " + mat.elements[2] + ", " + mat.elements[6] + ", " + mat.elements[10] + ", " + mat.elements[14] + " |");
+		console.log("| " + mat.elements[3] + ", " + mat.elements[7] + ", " + mat.elements[11] + ", " + mat.elements[15] + " |");
+
+	}
+
 
 	console.log("--------------END--------------");
 
@@ -1425,14 +1730,20 @@ function printMatrix (mat,name,round) {
 
 
 let Scene1;
-var keypressed = {};
-function main () {
+let keypressed = {};
+/**
+ * The main function ran on load
+ * Gets the canvas and instantiates the scene graph
+ * defines the key events
+ * @returns {null} No return value
+ */
+function main () {	// eslint-disable-line no-unused-vars
 
-	  // Retrieve <canvas> element
+	// Retrieve <canvas> element
 
-  	let canvas = document.getElementById("webgl");
+	let canvas = document.getElementById("webgl");
 
-  	// Get the rendering context for WebGL
+	// Get the rendering context for WebGL
 	let gl = getWebGLContext(canvas);
 	if (!gl) {
 
@@ -1441,7 +1752,10 @@ function main () {
 
 	}
 
-	  Scene1 = new Scene(gl,canvas);
+	// Objects and scene graph
+	// #region Scene Graph
+
+	Scene1 = new Scene(gl,canvas);
 
 	let woodText = new Texture("table",Scene1.gl,Scene1.program);
 	let carpet = new Texture("carpet",Scene1.gl,Scene1.program);
@@ -1495,10 +1809,10 @@ function main () {
 
 	let mug = Scene1.newModel("mug",0);
 	mug.updateScale(new Vector3([0.6,0.6,0.6]));
-	mug.updatePos(new Vector3([0,-0.6,-3.5]));
+	mug.updatePos(new Vector3([0,-0.9,-3.5]));
 	let plate = Scene1.newModel("plate",0);
 	plate.updateScale(new Vector3([1.1,1.1,1.1]));
-	plate.updatePos(new Vector3([0.8,-0.4,0]));
+	plate.updatePos(new Vector3([0.8,-0.7,0]));
 
 	mug.textures.push(ceramic);
 	plate.textures.push(ceramic);
@@ -1509,12 +1823,42 @@ function main () {
 	tableTop.textures.push(woodText);
 
 
+	tableParent.updateScale(new Vector3([1,1,0.85]));
+	tableParent.children.push(plate);
+	tableParent.children.push(mug);
+
 	// #endregion Table
 
+	let ChairParent = Scene1.newModel("chairParent",2);
+	let chairBack = Scene1.newModel("tableTop",0);
+	let chairSeat = Scene1.newModel("tableTop",0);
+	let chairLeg = Scene1.newModel("tableLeg",0);
+	chairLeg.updateScale(new Vector3([1,0.2,0.8]));
+	chairBack.updateRot(new Vector3([90,0,0]));
+	chairBack.updateScale(new Vector3([0.5,0.3,0.25]));
+	chairBack.updatePos(new Vector3([0,3,-1.9]));
+	chairSeat.updateScale(new Vector3([0.5,0.7,0.2]));
 
+
+	ChairParent.addChild(chairBack);
+	ChairParent.addChild(chairLeg);
+	ChairParent.addChild(chairSeat);
+
+	chairSeat.textures.push(woodText);
+	chairBack.textures.push(woodText);
+	chairLeg.textures.push(woodText);
+	ChairParent.updateScale(new Vector3([0.5,0.55,0.6]));
+	ChairParent.updatePos(new Vector3([0,-1.3,-5.4]));
+	// -5.4 to -7.5
 	// #region sofas
 
 	let sofa1 = Scene1.newModel("sofa1",0);
+	let cushion1 = Scene1.newModel("cushion",0);
+	sofa1.addChild(cushion1);
+	let cushion2 = Scene1.newModel("cushion",0);
+	sofa1.addChild(cushion2);
+
+
 	sofa1.updatePos(new Vector3([8.9,-2.5,1.2]));
 
 
@@ -1532,6 +1876,14 @@ function main () {
 	sofa2.textures.push(sofa2Text);
 	sofa3.textures.push(sofa2Text);
 
+
+	cushion1.updatePos(new Vector3([8.7,0,2]));
+	cushion1.updateScale(new Vector3([0.6,0.6,0.6]));
+	cushion2.updatePos(new Vector3([8.7,0,-1.5]));
+	cushion2.updateScale(new Vector3([0.6,0.6,0.6]));
+
+	cushion1.textures.push(shadeText);
+	cushion2.textures.push(shadeText);
 	// #endregion sofas
 
 
@@ -1557,6 +1909,9 @@ function main () {
 	soundbar.updateScale(new Vector3([0.5,0.5,0.4]));
 	soundbar.textures.push(metalText);
 
+	TVStand.children.push(soundbar);
+	TVStand.children.push(TV);
+
 	let floor = Scene1.newModel("quad",0);
 	floor.updatePos(new Vector3([0,-3,0]));
 	floor.updateScale(new Vector3([10,1,10]));
@@ -1579,7 +1934,7 @@ function main () {
 
 	bulb.updateRot(new Vector3([180,0,0]));
 	bulb.updateScale(new Vector3([0.6,0.6,0.6]));
-
+	bulb.updatePos(new Vector3([0,-1,0]));
 	shade.updatePos(new Vector3([0,1,0]));
 
 	cable2.updatePos(new Vector3([0,-3.4,0]));
@@ -1591,6 +1946,10 @@ function main () {
 
 	Scene1.fitting = lightFitting;
 
+	cable1.textures.push(ceramic);
+	cable2.textures.push(ceramic);
+	bulb.textures.push(ceramic);
+	shade.textures.push(shadeText);
 	// #region walls
 	let wallsRoot = Scene1.newModel("wallRoot",2);
 
@@ -1645,6 +2004,22 @@ function main () {
 
 	// #endregion walls
 
+	floor.children.push(wallsRoot);
+	floor.children.push(tableParent);
+	floor.children.push(TVStand);
+	floor.children.push(lightFitting);
+	floor.children.push(sofa1);
+	floor.children.push(sofa2);
+	floor.children.push(sofa3);
+
+	Scene1.cushions = [];
+	Scene1.cushions.push(cushion1);
+	Scene1.cushions.push(cushion2);
+	Scene1.chair = ChairParent;
+
+	// #endregion Scene Graph
+
+	// Key events and animations
 	document.onkeydown = function (ev) {
 
 		// for events on update/ multi key presses
@@ -1653,25 +2028,32 @@ function main () {
 		// events on key press
 		if (keypressed["84"]) {
 
-			// use for specific model ie TV for changing image
 			// t pressed
+			// changes the channel on the TV
 			TV.changeTexture();
 
 		}
 		if (keypressed["32"]) {
 
-			// initial load
 			// spacebar pressed
+			// lowers walls to fully show room - see update function
 			startLoadAnimation = true;
 
 		}
 		if (keypressed["76"]) {
 
 			// l pressed
+			// lights start to flicker - see update function
 			lightAnimation = !lightAnimation;
 			if (!lightAnimation) {
 
 				Scene1.lightScalar = 0.65;
+
+			}
+			else{
+
+				deltaFlash = Math.random();
+				Scene1.lightScalar = Math.random() * (0.6) + 0.1;
 
 			}
 
@@ -1679,14 +2061,42 @@ function main () {
 		if (keypressed["77"]) {
 
 			// m pressed
+			// Starts swaying of light in random direction and magnitude
 			lightMoveAnimation = true;
+			dirX = Math.random() * 2 - 1;
+			dirZ = Math.random() * 2 - 1;
 
 		}
-		// if (keypressed["48"]){
-		// 	// 0 pressed
-		// 	lightMoveAnimation = false;
+		if (keypressed["67"]) {
 
-		// }
+			// c pressed
+			// alternates shader
+			Scene1.activeFS = (1 + Scene1.activeFS) % Scene1.fragmentShaders.length;
+
+			if (!Scene1.changeShader()) {
+
+				console.log("Failed to intialize shaders.");
+				return;
+
+			}
+
+			Scene1.getShaderLocations();
+
+		}
+		if (keypressed["78"]) {
+
+			// n pressed
+			// Rotate cushion animation
+			cushionAnimation = true;
+
+		}
+		if (keypressed["66"]) {
+
+			// b pressed
+			// Move Chair animation
+			chairAnimation = true;
+
+		}
 
 
 	};
@@ -1695,7 +2105,7 @@ function main () {
 		keypressed[ev.keyCode] = false;
 
 	};
+
 	window.requestAnimationFrame(update);
 
 }
-
