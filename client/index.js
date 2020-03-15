@@ -5,134 +5,160 @@
 // Practical 3 - Chair.js
 
 // #region shaders
-// point light per fragment
-let VSHADER_SOURCE_DEFAULT =
-"#ifdef GL_ES\n" +
-"precision mediump float;\n" +
-"#endif\n" +
-"attribute vec4 a_Position;\n" +
-"attribute vec4 a_Color;\n" +
-"attribute vec4 a_Normal;\n" +        // Normal
-"attribute vec2 a_TexCoords;\n" +
-"uniform mat4 u_ModelMatrix;\n" +
-"uniform mat4 u_NormalMatrix;\n" +
-// 'uniform mat4 u_ViewMatrix;\n' +
-"uniform mat4 u_MVPMatrix;\n" +
-// 'uniform mat4 u_ProjMatrix;\n' +
-"uniform vec3 u_LightColor;\n" +     // Light color
-"uniform vec3 u_LightPosition;\n" + // Light direction (in the world coordinate, normalized)
-"uniform vec3 u_AmbientLight;\n" +
-"uniform bool u_isLighting;\n" +
-"varying vec4 v_Color;\n" +
-"varying vec3 v_Normal;\n" +
-"varying vec3 v_Position;\n" +
-"varying vec2 v_TexCoords;\n" +
-"void main() {\n" +
-// '  gl_Position = u_ProjMatrix * u_ViewMatrix * u_ModelMatrix * a_Position;\n' +
-"  gl_Position = u_MVPMatrix * u_ModelMatrix * a_Position;\n" +
-"  if(u_isLighting)\n" +
-"  {\n" +
-"	v_Position = vec3(u_ModelMatrix * a_Position);\n" +
-
-"	v_Normal = normalize(vec3(u_NormalMatrix * a_Normal));\n" +
-" 	v_Color = a_Color;\n" + "  }\n" +
-"  else\n" +
-"  {\n" +
-"     v_Color = a_Color;\n" +
-"  }\n" +
-"  v_TexCoords = a_TexCoords;\n" +
-"}\n";
-// Fragment shader program for point light
-let FSHADER_SOURCE_POINT =
-"#ifdef GL_ES\n" +
-"precision mediump float;\n" +
-"#endif\n" +
-"uniform bool u_UseTextures;\n" +    // Texture enable/disable flag
-"uniform vec3 u_LightColor;\n" +	// light colour
-"uniform vec3 u_LightPosition;\n" +	// position of the light source
-"uniform vec3 u_AmbientLight;\n" + 	// ambient light colour
-"varying vec3 v_Normal;\n" +
-"varying vec3 v_Position;\n" +
-"varying vec4 v_Color;\n" +
-"uniform sampler2D u_Sampler;\n" +
-"varying vec2 v_TexCoords;\n" +
-"void main() {\n" +
-// Normalize normal because it's interpolated and not 1.0 (length)
-"	vec3 normal = normalize(v_Normal);\n" +
-// Calculate the light direction and make it 1.0 in length
-"	vec3 lightDirection = normalize(u_LightPosition - v_Position);\n" +
-// The dot product of the light direction and the normal
-"	float nDotL = max(dot(lightDirection,normal),0.0);\n" +
-// Calculate the final color from diffuse and ambient reflection
-"	vec3 ambient = u_AmbientLight * v_Color.rgb;\n" +
-"  vec3 diffuse;\n" +
-"  if (u_UseTextures) {\n" +
-// '     vec4 TexColor = texture2D(u_Sampler, v_TexCoords);\n' +
-// '     diffuse = u_LightColor * TexColor.rgb * nDotL * 1.2;\n' +
-"     diffuse = u_LightColor.rgb * nDotL * 1.2;\n" +
-"  	  gl_FragColor = vec4(diffuse + ambient, v_Color.a) * texture2D( u_Sampler, v_TexCoords );\n" +
-"  } else {\n" +
-// "	vec3 diffuse = u_LightColor * v_Color.rgb * nDotL;\n"+
-"	vec3 diffuse = u_LightColor.rgb * vec3(0.8,0.8,0.8) * nDotL;\n" +
-"  gl_FragColor = vec4(diffuse + ambient, v_Color.a);\n" +
-"  }\n" +
-
-"}\n";
+let VSHADER_SOURCE = `
+#ifdef GL_ES
+precision mediump float;
+#endif
+attribute vec4 a_Position;
+attribute vec4 a_Color;
+attribute vec4 a_Normal;       // Normal
+attribute vec2 a_TexCoords;
+uniform mat4 u_ModelMatrix;
+uniform mat4 u_NormalMatrix;
+uniform mat4 u_VPMatrix;
+uniform vec3 u_LightColor;     // Light color
+uniform vec3 u_LightPosition; // Light direction (in the world coordinate, normalized)
+uniform vec3 u_AmbientLight;
+uniform bool u_isLighting;
+varying vec4 v_Color;
+varying vec3 v_Normal;
+varying vec3 v_Position;
+varying vec2 v_TexCoords;
 
 
-// Fragment shader program for cell shading
-let FSHADER_SOURCE_TOON =
-"#ifdef GL_ES\n" +
-"precision mediump float;\n" +
-"#endif\n" +
-"uniform bool u_UseTextures;\n" +    // Texture enable/disable flag
-"uniform vec3 u_LightColor;\n" +	// light colour
-"uniform vec3 u_LightPosition;\n" +	// position of the light source
-"uniform vec3 u_AmbientLight;\n" + 	// ambient light colour
-"varying vec3 v_Normal;\n" +
-"varying vec3 v_Position;\n" +
-"varying vec4 v_Color;\n" +
-"uniform sampler2D u_Sampler;\n" +
-"varying vec2 v_TexCoords;\n" +
-"void main() {\n" +
-// Normalize normal because it's interpolated and not 1.0 (length)
-" const float A = 0.1;\n" +
-" const float B = 0.3;\n" +
-" const float C = 0.5;\n" +
-" const float D = 0.8;\n" +
-" const float F = 1.0;\n" +
+// Common transpose function to transpose a matrix
+mat3 transpose(in mat3 inMatrix)
+{
+    vec3 i0 = inMatrix[0];
+    vec3 i1 = inMatrix[1];
+    vec3 i2 = inMatrix[2];
 
-"	vec3 normal = normalize(v_Normal);\n" +
-// Calculate the light direction and make it 1.0 in length
-"	vec3 lightDirection = normalize(u_LightPosition - v_Position);\n" +
-// The dot product of the light direction and the normal
-"	float nDotL = max(dot(lightDirection,normal),0.0);\n" +
-"	vec3 ambient = u_AmbientLight * v_Color.rgb;\n" +
+    mat3 outMatrix = mat3(
+        vec3(i0.x, i1.x, i2.x),
+        vec3(i0.y, i1.y, i2.y),
+        vec3(i0.z, i1.z, i2.z)
+    );
+
+    return outMatrix;
+}
+
+void main() {
+// '  gl_Position = u_ProjMatrix * u_ViewMatrix * u_ModelMatrix * a_Position;
+
+	gl_Position = u_VPMatrix * u_ModelMatrix * a_Position;
+	if(u_isLighting)
+	{
+	v_Position = vec3(u_ModelMatrix * a_Position);
+
+	// vec3 t; 
+	// vec3 b; 
+	// vec3 c1 = cross(a_Normal.xyz, vec3(0.0, 0.0, 1.0)); 
+	// vec3 c2 = cross(a_Normal.xyz, vec3(0.0, 1.0, 0.0)); 
+	// if (length(c1) > length(c2)){
+	// 	t = c1;	
+	// }
+	// else{
+	// 	t = c2;	
+	// }
+	
+	// t = normalize(t);
+	// b = normalize(cross(a_Normal.xyz, t)); 
+	// vec3 n = normalize(cross(t,b));
+	// mat3 tbn = transpose(mat3(t,b,n));
+	// v_Position = tbn * v_Position;
+	// lightPos = tbn * u_LightPosition;
+
+	v_Normal = normalize(vec3(u_NormalMatrix * a_Normal));
+	v_Color = a_Color; 
+	
+
+	}
+  	else
+  	{
+    	v_Color = a_Color;
+	}
+
+	v_TexCoords = a_TexCoords;
+}
+`;
 
 
-"if (nDotL < A) nDotL = 0.0;\n" +
-"else if (nDotL < B) nDotL = B;\n" +
-"else if (nDotL < C) nDotL = C;\n" +
-"else if (nDotL < D) nDotL = D;\n" +
-"else nDotL = F;\n" +
+let FSHADER_SOURCE = `
+#ifdef GL_ES
+precision mediump float;
+#endif
+uniform bool u_UseTextures;    // Texture enable/disable flag
+uniform vec3 u_LightColor;	// light colour
+uniform vec3 u_LightPosition;	// position of the light source
+uniform vec3 u_AmbientLight; 	// ambient light colour
+uniform bool u_UseToonShading;
+uniform bool u_UseNormalMap;
+uniform mat4 u_ModelMatrix;
+uniform sampler2D u_normalTextureSampler;
+varying vec3 v_Normal;
+varying vec3 v_Position;
+varying vec4 v_Color;
+uniform sampler2D u_Sampler;
+varying vec2 v_TexCoords;
 
-" vec3 E = vec3(0, 0, 1);\n" +
-" vec3 H = normalize(nDotL + E);\n" +
 
-"  vec3 diffuse;\n" +
-// The dot product of the H value and the normal
-"	float nDotH = max(dot(H,normal),0.0);\n" +
-"  if (u_UseTextures) {\n" +
-// '     vec4 TexColor = texture2D(u_Sampler, v_TexCoords);\n' +
-// '     diffuse = u_LightColor * TexColor.rgb * nDotL * 1.2;\n' +
-"     diffuse = u_LightColor.rgb * nDotL * 1.2;\n" +
-"  	  gl_FragColor = vec4(diffuse + ambient, v_Color.a) * texture2D( u_Sampler, v_TexCoords );\n" +
-"  } else {\n" +
-// "	vec3 diffuse = u_LightColor * v_Color.rgb * nDotL;\n"+
-"	vec3 diffuse = u_LightColor.rgb * vec3(0.8,0.8,0.8) * nDotL;\n" +
-"  gl_FragColor = vec4(diffuse + ambient, v_Color.a);\n" +
-"  }\n" +
-"}\n";
+void main() {
+	// Normalize normal because it's interpolated and not 1.0 (length)
+	vec3 normal = normalize(v_Normal);
+	
+
+	// Calculate the light direction and make it 1.0 in length
+
+	vec3 lightDirection = normalize(u_LightPosition - v_Position);
+	// vec3 lightDirection = normalize(lightPos - v_Position);
+
+	float normalDiffuse = 1.0;
+	if (u_UseNormalMap){
+		vec3 direction = normalize(vec3(1.0,-1.0,0.0));
+		vec3 normalMap = normalize(texture2D(u_normalTextureSampler, v_TexCoords).rgb * 2.0 - 1.0 );
+		// vec3 rar = normalize(texture2D(u_normalTextureSampler, v_TexCoords).rgb * 2.0 - 1.0 );
+		normalDiffuse = 1.0+ (dot(direction,normalMap));
+	}
+
+
+	// The dot product of the light direction and the normal
+
+	float nDotL = max(dot(lightDirection,normal),0.0);
+	// Calculate the final color from diffuse and ambient reflection
+	vec3 ambient = u_AmbientLight * v_Color.rgb;
+
+	if (u_UseToonShading)
+	{
+
+		const float A = 0.1;
+		const float B = 0.3;
+		const float C = 0.5;
+		const float D = 0.8;
+		const float F = 1.0;
+
+		if (nDotL < A) nDotL = 0.0;
+		else if (nDotL < B) nDotL = B;
+		else if (nDotL < C) nDotL = C;
+		else if (nDotL < D) nDotL = D;
+		else nDotL = F;
+
+	}
+	vec3 diffuse;
+	if (u_UseTextures) {
+		vec3 albedo = texture2D(u_Sampler, v_TexCoords).rgb;
+		
+		diffuse = u_LightColor.rgb * nDotL * 1.0 * normalDiffuse;
+
+		gl_FragColor = vec4(diffuse * albedo + ambient , v_Color.a);
+
+
+	} else {
+
+		vec3 diffuse = u_LightColor.rgb * vec3(0.8,0.8,0.8) * nDotL;
+		gl_FragColor = vec4(diffuse + ambient, v_Color.a);
+	}
+}
+`;
 
 // #endregion shaders
 class Scene {
@@ -147,10 +173,7 @@ class Scene {
 
 		this.gl = gl;
 		this.canvas = canvas;
-		this.vertexShaders = [VSHADER_SOURCE_DEFAULT];
-		this.fragmentShaders = [FSHADER_SOURCE_POINT,FSHADER_SOURCE_TOON];
-		this.activeVS = 0;
-		this.activeFS = 1;
+
 		// Initialize shaders
 
 		if (!this.changeShader()) {
@@ -164,7 +187,7 @@ class Scene {
 		this.program = this.gl.program;
 		this.viewMatrix = new Matrix4();  // The view matrix
 		this.projMatrix = new Matrix4();  // The projection matrix
-		this.mvpMatrix = new Matrix4();
+		this.VPMatrix = new Matrix4();
 		this.models = [];
 		// Set clear color to white and enable hidden surface removal
 		this.gl.clearColor(0.8, 0.8, 0.8, 0.8);
@@ -186,12 +209,14 @@ class Scene {
 		this.viewMatrix.setLookAt(this.eye.x, this.eye.y, this.eye.z, 0, 0, 0, 0, 1.0, 0.0);
 		this.projMatrix.setPerspective(90, this.canvas.width / this.canvas.height, 1, 100);
 
-		this.mvpMatrix.set(this.projMatrix).multiply(this.viewMatrix);
+		this.VPMatrix.set(this.projMatrix).multiply(this.viewMatrix);
 
-		this.gl.uniformMatrix4fv(this.program.u_MVPMatrix, false, this.mvpMatrix.elements);
+		this.gl.uniformMatrix4fv(this.program.u_VPMatrix, false, this.VPMatrix.elements);
 
 		// depth of camera value
 		this.depth = -25;
+		this.textures = [];
+
 
 	}
 	/**
@@ -202,8 +227,8 @@ class Scene {
 	changeShader () {
 
 		// load both shaders
-		this.vertexShader = loadShader(this.gl, this.gl.VERTEX_SHADER, this.vertexShaders[this.activeVS]);
-		this.fragmentShader = loadShader(this.gl, this.gl.FRAGMENT_SHADER, this.fragmentShaders[this.activeFS]);
+		this.vertexShader = loadShader(this.gl, this.gl.VERTEX_SHADER, VSHADER_SOURCE);
+		this.fragmentShader = loadShader(this.gl, this.gl.FRAGMENT_SHADER, FSHADER_SOURCE);
 		// Create a program object
 		let program = this.gl.createProgram();
 		if (!program) {
@@ -252,7 +277,7 @@ class Scene {
 		this.program.a_TexCoords = this.gl.getAttribLocation(this.program, "a_TexCoords");
 		this.program.u_ModelMatrix = this.gl.getUniformLocation(this.program, "u_ModelMatrix");
 		this.program.u_NormalMatrix = this.gl.getUniformLocation(this.program,"u_NormalMatrix");
-		this.program.u_MVPMatrix = this.gl.getUniformLocation(this.program,"u_MVPMatrix");
+		this.program.u_VPMatrix = this.gl.getUniformLocation(this.program,"u_VPMatrix");
 		this.program.u_LightColor = this.gl.getUniformLocation(this.program, "u_LightColor");
 		this.program.u_LightPosition = this.gl.getUniformLocation(this.program, "u_LightPosition");
 		this.program.u_AmbientLight = this.gl.getUniformLocation(this.program, "u_AmbientLight");
@@ -260,9 +285,16 @@ class Scene {
 		// Trigger using lighting or not
 		this.program.u_isLighting = this.gl.getUniformLocation(this.gl.program, "u_isLighting");
 
-		if (!this.program.u_MVPMatrix || !this.program.u_LightPosition) {
+		if (!this.program.u_VPMatrix) {
 
-			console.log("Failed to Get the storage locations of u_ViewMatrix, and/or u_ProjMatrix");
+			console.log("Failed to Get the storage locations of u_ViewProjMatrix,");
+			return;
+
+		}
+
+		if (!this.program.u_LightPosition) {
+
+			console.log("Failed to Get the storage locations of u_lightPositionMatrix,");
 			return;
 
 		}
@@ -280,9 +312,33 @@ class Scene {
 			return;
 
 		}
+		this.program.u_UseToonShading = this.gl.getUniformLocation(this.program, "u_UseToonShading");
+		if (!this.program.u_UseToonShading) {
 
+			console.log("Failed to get the storage location for toon shading flag");
+			return;
+
+		}
+		this.ToonShading = true;
+		this.gl.uniform1i(this.program.u_UseToonShading, this.ToonShading);
+
+		this.program.u_UseNormalMap = this.gl.getUniformLocation(this.program, "u_UseNormalMap");
+		if (!this.program.u_UseNormalMap) {
+
+			console.log("Failed to get the storage location for normal map flag");
+			return;
+
+		}
+		this.program.u_normalTextureSampler = this.gl.getUniformLocation(this.program, "u_normalTextureSampler");
+		if (!this.program.u_normalTextureSampler) {
+
+			console.log("Failed to get the storage location for normal map sampler");
+			return;
+
+		}
 		// Initialise ambient light to be low to emphasise the flickering light - on click of L
 		this.gl.uniform3f(this.program.u_AmbientLight,0.05, 0.05, 0.05);
+
 
 		// Set default lighting boolean and position
 		this.lightPosition = new Vector3([0,10,0]);
@@ -306,6 +362,19 @@ class Scene {
 
 		this.models.push(model);
 		return model;
+
+	}
+	/**
+	 * Push a new texture into the array of textures present in the Scene
+	 * @param {String} name Name of the texture
+	 * @returns {Texture} Returns the texture instantiated
+	 */
+	newTexture (name,normal) {
+
+
+		let text = new Texture(name,this.gl,this.textures.length,normal);
+		this.textures.push(text);
+		return text;
 
 	}
 	/**
@@ -338,6 +407,7 @@ class Scene {
 		}
 		// updates the new light position and light colour to the shader program
 		this.gl.uniform3f(this.program.u_LightPosition, this.lightPosition.elements[0],this.lightPosition.elements[1], this.lightPosition.elements[2]);
+		
 		this.gl.uniform3f(this.program.u_LightColor, 1 * this.lightScalar, 1 * this.lightScalar, 1 * this.lightScalar);
 
 	}
@@ -445,10 +515,10 @@ class Scene {
 		mat4.rotateX(this.viewMatrix.elements,this.viewMatrix.elements, this.eye.x);
 		mat4.rotateY(this.viewMatrix.elements,this.viewMatrix.elements, this.eye.y);
 
-		this.mvpMatrix.set(this.projMatrix).multiply(this.viewMatrix);
+		this.VPMatrix.set(this.projMatrix).multiply(this.viewMatrix);
 
 		// Pass the model, view, and projection matrix to the uniform variable respectively
-		this.gl.uniformMatrix4fv(this.program.u_MVPMatrix, false, this.mvpMatrix.elements);
+		this.gl.uniformMatrix4fv(this.program.u_VPMatrix, false, this.VPMatrix.elements);
 
 	}
 
@@ -503,38 +573,27 @@ class Model {
 			}
 
 		}
-		// set default transforms
-		this.modelMatrix.setTranslate(0,0,0);
+		if (rot) {
 
-		if (pos) {
-
-			this.modelMatrix.translate(pos.elements[0],pos.elements[1],pos.elements[2]);
+			this.updateRot(rot);
 
 		}
-		else{
+		if (pos) {
 
-			this.modelMatrix.translate(0,0,0);
+			this.updatePos(pos);
 
 		}
 		if (scale) {
 
-			this.modelMatrix.scale(scale.elements[0],scale.elements[1],scale.elements[2]);
+			this.updateScale(scale);
 
 		}
-		else{
 
-			this.modelMatrix.scale(1,1,1);
+		this.normalTexture = undefined;
 
-		}
-		if (rot) {
-
-			this.modelMatrix.rotate(rot.elements[1],0,1,0);
-			this.modelMatrix.rotate(rot.elements[0],1,0,0);
-			this.modelMatrix.rotate(rot.elements[2],0,0,1);
-
-		}
 
 		this.children = [];
+		this.dampening = false;
 
 	}
 	/**
@@ -561,7 +620,17 @@ class Model {
 			// this.children[i].modelMatrix.elements = mat4.multiply(this.children[i].modelMatrix.elements,this.modelMatrix.elements,this.children[i].modelMatrix.elements)
 			this.children[i].updateModelMatrix();
 			this.children[i].modelMatrix.elements = mat4.multiply(this.children[i].modelMatrix.elements,this.modelMatrix.elements,this.children[i].modelMatrix.elements);
+
+			// if (rate) {
+
+			// 	this.children[i].modelMatrix.elements = mat4.multiplyScalar(this.children[i].modelMatrix.elements,this.children[i].modelMatrix.elements,rate);
+			// 	rate = rate * 2;
+			// 	this.children[i].updateChildren(rate);
+
+			// }else {
+
 			this.children[i].updateChildren();
+
 
 		}
 
@@ -577,6 +646,7 @@ class Model {
 		this.scale.elements[1] *= scale.elements[1];
 		this.scale.elements[2] *= scale.elements[2];
 		this.updateModelMatrix();
+		this.updateChildren();
 
 	}
 	/**
@@ -590,6 +660,7 @@ class Model {
 		this.position.elements[1] += pos.elements[1];
 		this.position.elements[2] += pos.elements[2];
 		this.updateModelMatrix();
+		this.updateChildren();
 
 	}
 	/**
@@ -603,6 +674,7 @@ class Model {
 		this.rotation.elements[1] += rot.elements[1];
 		this.rotation.elements[2] += rot.elements[2];
 		this.updateModelMatrix();
+		this.updateChildren();
 
 	}
 	/**
@@ -615,9 +687,9 @@ class Model {
 		this.modelMatrix = this.modelMatrix.setIdentity();
 
 
-		// this.modelMatrix.setRotate(this.rotation.elements[1],0,1,0);
-		// this.modelMatrix.setRotate(this.rotation.elements[0],1,0,0);
-		// this.modelMatrix.setRotate(this.rotation.elements[2],0,0,1);
+		this.modelMatrix.setRotate(this.rotation.elements[1],0,1,0);
+		this.modelMatrix.rotate(this.rotation.elements[0],1,0,0);
+		this.modelMatrix.rotate(this.rotation.elements[2],0,0,1);
 
 
 		this.modelMatrix.translate(this.position.elements[0],this.position.elements[1],this.position.elements[2]);
@@ -626,11 +698,11 @@ class Model {
 		this.modelMatrix.scale(this.scale.elements[0],this.scale.elements[1],this.scale.elements[2]);
 
 
-		this.modelMatrix.rotate(this.rotation.elements[1],0,1,0);
-		this.modelMatrix.rotate(this.rotation.elements[0],1,0,0);
-		this.modelMatrix.rotate(this.rotation.elements[2],0,0,1);
-
+		// this.modelMatrix.rotate(this.rotation.elements[1],0,1,0);
+		// this.modelMatrix.rotate(this.rotation.elements[0],1,0,0);
+		// this.modelMatrix.rotate(this.rotation.elements[2],0,0,1);
 		this.updateChildren();
+
 
 	}
 	/**
@@ -735,6 +807,15 @@ class Model {
 
 			// Enable texture mapping
 			gl.uniform1i(program.u_UseTextures, false);
+
+		}
+		if (this.normalTexture) {
+
+			if (this.normalTexture.loaded) {
+
+				this.normalTexture.bindTexture(gl,program);
+
+			}
 
 		}
 
@@ -1282,13 +1363,29 @@ class Texture {
 	 * @param {String} name name of the texture - the endpoint on the server to get the object
 	 * @param {WebGLContext} gl The gl element in the html page
 	 */
-	constructor (name,gl) {
+	constructor (name,gl,pointer,normal) {
 
 		this.name = name;
 		this.loaded = false;
-		this.img = new Image();
-		this.img.src = "/Texture/" + this.name;
-		this.img.onload = this.onTextureLoad(gl);
+		this.pointer = pointer;
+		this.textureBuffer = gl.createTexture();
+		this.textureBuffer.img = new Image();
+		this.textureBuffer.img.src = "/Texture/" + this.name;
+		if (normal){
+			this.normal = normal;
+		}
+		else{
+			this.normal = false;
+		}
+		
+		// console.trace(this.normal);
+
+		let callbackObj = this;
+		this.textureBuffer.img.onload = function () {
+
+			callbackObj.onTextureLoad(gl);
+
+		};
 
 	}
 	/**
@@ -1298,7 +1395,52 @@ class Texture {
 	 */
 	onTextureLoad (gl) {
 
-		this.textureBuffer = gl.createTexture();
+
+		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1); // Flip the image's y axis
+
+		// Enable texture unit0
+		gl.activeTexture(gl.TEXTURE0 + this.pointer);
+
+		// Bind the texture object to the target
+
+		gl.bindTexture(gl.TEXTURE_2D, this.textureBuffer);
+		// Set the texture image
+
+		// console.log(this.textureBuffer.img.src + "\t"+this.textureBuffer.img.height+"\t"+this.textureBuffer.img.width)
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, this.textureBuffer.img);
+		if (isPower2(this.textureBuffer.img.width) && isPower2(this.textureBuffer.img.height)) {
+
+			gl.generateMipmap(gl.TEXTURE_2D);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
+			// gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+			// gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+
+		}
+		else if (this.textureBuffer.img.width == this.textureBuffer.img.height) {
+
+			// console.log("square"+this.name)
+
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+			// gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+			// gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+
+		}
+		else{
+
+			console.log("clamp\t" + this.name + "\t" + this.textureBuffer.img.height + "\t" + this.textureBuffer.img.width);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+		}
+
+
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 		this.loaded = true;
 
 	}
@@ -1310,55 +1452,23 @@ class Texture {
 	 */
 	bindTexture (gl,program) {
 
-		if (this.img) {
+		if (this.loaded) {
 
-			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1); // Flip the image's y axis
+			if (this.normal) {
 
-			// Enable texture unit0
-			gl.activeTexture(gl.TEXTURE0);
-
-			// Bind the texture object to the target
-
-			gl.bindTexture(gl.TEXTURE_2D, this.textureBuffer);
-			// Set the texture image
-
-			// console.log(this.img.src + "\t"+this.img.height+"\t"+this.img.width)
-			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, this.img);
-			if (isPower2(this.img.width) && isPower2(this.img.height)) {
-
-				gl.generateMipmap(gl.TEXTURE_2D);
-				// gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-				// gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-
-			}
-			else if (this.img.width == this.img.height) {
-
-				// console.log("square"+this.name)
-
-				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-				// gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-				// gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+				// Assign u_Sampler to TEXTURE0
+				gl.uniform1i(program.u_normalTextureSampler, this.pointer);
+				gl.uniform1i(program.u_UseNormalMap, true);
 
 			}
 			else{
 
-				console.log("clamp the fuck out\t" + this.name + "\t" + this.img.height + "\t" + this.img.width);
-				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-
-				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+				// Assign u_Sampler to TEXTURE0
+				gl.uniform1i(program.u_Sampler, this.pointer);
+				gl.uniform1i(program.u_UseNormalMap, false);
 
 			}
 
-
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-
-
-			// Assign u_Sampler to TEXTURE0
-			gl.uniform1i(program.u_Sampler, 0);
 
 			// Enable texture mapping
 			gl.uniform1i(program.u_UseTextures, true);
@@ -1372,6 +1482,7 @@ class Texture {
 		}
 
 	}
+
 
 }
 
@@ -1564,12 +1675,25 @@ function update (currTime) {
 		if (startLoadAnimation) {
 
 			// moves walls down on spacebar click
-			Scene1.walls.children[0].updateRot(new Vector3([0,0,-deltaTime * 45]));
-			Scene1.walls.children[1].updateRot(new Vector3([deltaTime * 45,0,0]));
-			Scene1.walls.children[2].updateRot(new Vector3([0,0,deltaTime * 45]));
-			Scene1.walls.children[3].updateRot(new Vector3([-deltaTime * 45,0,0]));
+			Scene1.walls.children[0].children[0].rotation.elements[0] += deltaTime * 45;
+			Scene1.walls.children[0].updateModelMatrix();
+			Scene1.walls.children[0].updateChildren();
+			Scene1.walls.children[1].children[0].rotation.elements[0] += deltaTime * 45;
+			Scene1.walls.children[1].updateModelMatrix();
+			Scene1.walls.children[1].updateChildren();
+			Scene1.walls.children[2].children[0].rotation.elements[0] += -deltaTime * 45;
+			Scene1.walls.children[2].updateModelMatrix();
+			Scene1.walls.children[2].updateChildren();
+			Scene1.walls.children[3].children[0].rotation.elements[0] += -deltaTime * 45;
+			Scene1.walls.children[3].updateModelMatrix();
+			Scene1.walls.children[3].updateChildren();
+			// Scene1.walls.children[0].children[0].updateRot(new Vector3([-deltaTime * 45,0,0]));
+			// Scene1.walls.children[1].children[0].updateRot(new Vector3([deltaTime * 45,0,0]));
+			// Scene1.walls.children[2].children[0].updateRot(new Vector3([deltaTime * 45,0,0]));
+			// Scene1.walls.children[3].children[0].updateRot(new Vector3([-deltaTime * 45,0,0]));
 
-			if (Scene1.walls.children[0].rotation.elements[2] < -90) {
+
+			if (Scene1.walls.children[0].children[0].rotation.elements[0] > 90) {
 
 				ranStartAnimation = true;
 
@@ -1591,28 +1715,45 @@ function update (currTime) {
 		}
 
 	}
-
+	// ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	if (lightMoveAnimation) {
 
 		// light sways when m is clicked
 
 		lightTime += deltaTime;
 
-		let angle = Math.cos(2 * Math.PI * lightTime) * Math.exp(-lightTime / 4) * 4;
-		Scene1.fitting.updateRot(new Vector3([angle * dirX,0,angle * dirZ]));
+		let angle = Math.cos(2 * Math.PI * lightTime) * 4 * (-(lightTime / 10 - 1) * -(lightTime / 10 - 1) * -(lightTime / 10 - 1));
+		// Scene1.fitting.children[0].rotation.elements[0] += angle; // updateRot(new Vector3([angle,0,0]));
+		// Scene1.fitting.updateModelMatrix();
+		// Scene1.fitting.updateChildren(0.25);
+
+		Scene1.fitting.children[0].rotation.elements[0] += angle / 4; // updateRot(new Vector3([angle,0,0]));
+		Scene1.fitting.children[0].children[0].rotation.elements[0] += angle / 2;
+		Scene1.fitting.children[0].children[0].children[0].rotation.elements[0] += angle * 3 / 4;
+		Scene1.fitting.updateModelMatrix();
+		Scene1.fitting.updateChildren(0.25);
+
+		// Scene1.fitting.children[0].updateRot(new Vector3([angle * dirX,0,angle * dirZ]));
 
 
-		Scene1.lightPosition.elements[0] = Scene1.fitting.children[0].children[0].modelMatrix.elements[12];
-		Scene1.lightPosition.elements[1] = Scene1.fitting.children[0].children[0].modelMatrix.elements[13] - 1;
-		Scene1.lightPosition.elements[2] = Scene1.fitting.children[0].children[0].modelMatrix.elements[14];
+		Scene1.lightPosition.elements[0] = Scene1.fitting.children[0].children[0].children[0].modelMatrix.elements[12];
+		Scene1.lightPosition.elements[1] = Scene1.fitting.children[0].children[0].children[0].modelMatrix.elements[13] - 1;
+		Scene1.lightPosition.elements[2] = Scene1.fitting.children[0].children[0].children[0].modelMatrix.elements[14];
 
-		if (lightTime > 10) {
+		// Scene1.lightPosition.elements[0] = 0;
+		// Scene1.lightPosition.elements[1] = 10;
+		// Scene1.lightPosition.elements[2] = 0;
+
+		if (lightTime > 9.5) {
 
 			lightMoveAnimation = false;
 			lightTime = 0;
-			let temp = Scene1.fitting.rotation;
+			Scene1.fitting.children[0].rotation.elements[0] = 0;
+			Scene1.fitting.children[0].children[0].rotation.elements[0] = 0;
+			Scene1.fitting.children[0].children[0].children[0].rotation.elements[0] = 0;
+					Scene1.fitting.updateModelMatrix();
+		Scene1.fitting.updateChildren(0.25);
 
-			Scene1.fitting.updateRot(new Vector3([temp.elements[0] * -1,0,temp.elements[2] * -1]));
 
 		}
 
@@ -1623,22 +1764,27 @@ function update (currTime) {
 		// spin cushions and reset after 5 seconds
 		// on their own axis
 		cushionTime += deltaTime;
-		let angle = Math.sin(2 * Math.PI * cushionTime) * 10;
+		let angle = Math.sin(2 * Math.PI * cushionTime) * 7; //* 3*  (-(cushionTime / 10 - 1) * -(cushionTime / 10 - 1) * -(cushionTime / 10 - 1));// 0.2 / (Math.exp(-cushionTime) + 0.1);
 
 		for (let i = 0;i < Scene1.cushions.length;i++) {
 
-			Scene1.cushions[i].updateRot(new Vector3([angle,0,0]));
+			// Scene1.cushions[i].children[0].updateRot(new Vector3([angle,0,0]));
+			Scene1.cushions[i].children[0].rotation.elements[0] += angle;
+			Scene1.cushions[i].updateChildren();
 
 		}
-		if (cushionTime > 5) {
+
+
+		if (cushionTime > 8) {
 
 			cushionTime = 0;
 			cushionAnimation = false;
 
 			for (let i = 0;i < Scene1.cushions.length;i++) {
 
-				let temp = Scene1.cushions[i].rotation;
-				Scene1.cushions[i].updateRot(new Vector3([-1 * temp.elements[0],0,0]));
+				// let temp = Scene1.cushions[i].rotation;
+				Scene1.cushions[i].children[0].rotation.elements[0] = 0;
+				Scene1.cushions[i].updateChildren();
 
 			}
 
@@ -1650,6 +1796,7 @@ function update (currTime) {
 
 		// move chair between two points
 		if (chairPosition == 2) {
+
 
 			Scene1.chair.updatePos(new Vector3([0,0,deltaTime]));
 			if (Scene1.chair.position.elements[2] > -5.35) {
@@ -1729,6 +1876,8 @@ function printMatrix (mat,name,round) {	// eslint-disable-line no-unused-vars
 }
 
 
+
+
 let Scene1;
 let keypressed = {};
 /**
@@ -1740,8 +1889,12 @@ let keypressed = {};
 function main () {	// eslint-disable-line no-unused-vars
 
 	// Retrieve <canvas> element
-
+	let glparent = document.getElementById("glWidthParent");
 	let canvas = document.getElementById("webgl");
+	canvas.width = (glparent.offsetWidth);
+	canvas.style.width = (glparent.offsetWidth - 28) + "px";
+	canvas.height = screen.height - 275;
+
 
 	// Get the rendering context for WebGL
 	let gl = getWebGLContext(canvas);
@@ -1753,23 +1906,40 @@ function main () {	// eslint-disable-line no-unused-vars
 	}
 
 	// Objects and scene graph
-	// #region Scene Graph
+	// // #region Scene Graph
 
 	Scene1 = new Scene(gl,canvas);
 
-	let woodText = new Texture("table",Scene1.gl,Scene1.program);
-	let carpet = new Texture("carpet",Scene1.gl,Scene1.program);
-	let sofa1Text = new Texture("sofa1",Scene1.gl,Scene1.program);
-	let sofa2Text = new Texture("sofa2",Scene1.gl,Scene1.program);
-	let ceramic = new Texture("ceramic",Scene1.gl,Scene1.program);
-	let shadeText = new Texture("shade",Scene1.gl,Scene1.program);
+	window.addEventListener("resize", function () {
 
-	let TVtext1 = new Texture("TV1",Scene1.gl,Scene1.program);
-	let TVtext2 = new Texture("TV2",Scene1.gl,Scene1.program);
-	let TVtext3 = new Texture("TV3",Scene1.gl,Scene1.program);
-	let TVtext4 = new Texture("TV4",Scene1.gl,Scene1.program);
-	let metalText = new Texture("metal",Scene1.gl,Scene1.program);
-	let wallText = new Texture("wall",Scene1.gl,Scene1.program);
+
+		// set new width and height of canvas
+		canvas.width = (glparent.offsetWidth);
+		canvas.style.width = (glparent.offsetWidth - 28) + "px";
+		canvas.height = window.outerHeight - 275;
+
+		// reset center of canvas
+
+		Scene1.projMatrix.setPerspective(90, Scene1.canvas.width / Scene1.canvas.height, 1, 100);
+
+		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+	});
+
+	let woodText = Scene1.newTexture("table");
+	let carpet = Scene1.newTexture("carpet");
+	let sofa1Text = Scene1.newTexture("sofa1");
+	let sofa2Text = Scene1.newTexture("sofa2");
+	let ceramic = Scene1.newTexture("ceramic");
+	let shadeText = Scene1.newTexture("shade");
+
+	let TVtext1 = Scene1.newTexture("TV1");
+	let TVtext2 = Scene1.newTexture("TV2");
+	let TVtext3 = Scene1.newTexture("TV3");
+	let TVtext4 = Scene1.newTexture("TV4");
+	let metalText = Scene1.newTexture("metal");
+	let wallText = Scene1.newTexture("wall");
+	let wallNormalText = Scene1.newTexture("wallNormal",true);
 
 
 	// #region Table
@@ -1854,9 +2024,7 @@ function main () {	// eslint-disable-line no-unused-vars
 
 	let sofa1 = Scene1.newModel("sofa1",0);
 	let cushion1 = Scene1.newModel("cushion",0);
-	sofa1.addChild(cushion1);
 	let cushion2 = Scene1.newModel("cushion",0);
-	sofa1.addChild(cushion2);
 
 
 	sofa1.updatePos(new Vector3([8.9,-2.5,1.2]));
@@ -1877,11 +2045,6 @@ function main () {	// eslint-disable-line no-unused-vars
 	sofa3.textures.push(sofa2Text);
 
 
-	cushion1.updatePos(new Vector3([8.7,0,2]));
-	cushion1.updateScale(new Vector3([0.6,0.6,0.6]));
-	cushion2.updatePos(new Vector3([8.7,0,-1.5]));
-	cushion2.updateScale(new Vector3([0.6,0.6,0.6]));
-
 	cushion1.textures.push(shadeText);
 	cushion2.textures.push(shadeText);
 	// #endregion sofas
@@ -1890,8 +2053,7 @@ function main () {	// eslint-disable-line no-unused-vars
 	let TVStand = Scene1.newModel("TV_Stand",0);
 	TVStand.updatePos(new Vector3([-8,-1.7,3.6]));
 	TVStand.updateScale(new Vector3([0.8,0.9,1]));
-	let StandText = new Texture("table",Scene1.gl,Scene1.program);
-	TVStand.textures.push(StandText);
+	TVStand.textures.push(woodText);
 
 	let TV = Scene1.newModel("TV",0);
 	TV.updatePos(new Vector3([-8,0.3,0]));
@@ -1923,14 +2085,16 @@ function main () {	// eslint-disable-line no-unused-vars
 
 	let cable1 = Scene1.newModel("lightCable",0);
 	let cable2 = Scene1.newModel("lightCable",0);
+	let cable3 = Scene1.newModel("lightCable",0);
 
 
 	let bulb = Scene1.newModel("bulb",0);
 	let shade = Scene1.newModel("shade",0);
 	lightFitting.children.push(cable1);
 	cable1.children.push(cable2);
-	cable2.children.push(bulb);
-	cable2.children.push(shade);
+	cable2.children.push(cable3);
+	cable3.children.push(bulb);
+	cable3.children.push(shade);
 
 	bulb.updateRot(new Vector3([180,0,0]));
 	bulb.updateScale(new Vector3([0.6,0.6,0.6]));
@@ -1938,10 +2102,11 @@ function main () {	// eslint-disable-line no-unused-vars
 	shade.updatePos(new Vector3([0,1,0]));
 
 	cable2.updatePos(new Vector3([0,-3.4,0]));
-
+	cable3.updatePos(new Vector3([0,-3.4,0]));
 	cable1.updatePos(new Vector3([0,-3.4,0]));
 
 	lightFitting.updatePos(new Vector3([0,15,0]));
+
 	lightFitting.updateScale(new Vector3([0.4,0.4,0.4]));
 
 	Scene1.fitting = lightFitting;
@@ -1950,18 +2115,19 @@ function main () {	// eslint-disable-line no-unused-vars
 	cable2.textures.push(ceramic);
 	bulb.textures.push(ceramic);
 	shade.textures.push(shadeText);
+
 	// #region walls
 	let wallsRoot = Scene1.newModel("wallRoot",2);
 
 	let wall1Parent = Scene1.newModel("wall1Parent",2);
 	let wall1 =  Scene1.newModel("wall",0);
 	wall1.updateRot(new Vector3([0,90,0]));
-	wall1.updateScale(new Vector3([1,2.5,2.5]));
-
+	wall1.updateScale(new Vector3([2.51,2.5,1]));
 
 	wall1Parent.children.push(wall1);
 
 	wall1Parent.updatePos(new Vector3([9.8,-2.8,0]));
+
 
 	wallsRoot.children.push(wall1Parent);
 
@@ -1978,7 +2144,7 @@ function main () {	// eslint-disable-line no-unused-vars
 	let wall3 =  Scene1.newModel("wall",0);
 
 	wall3.updateRot(new Vector3([0,90,0]));
-	wall3.updateScale(new Vector3([1,2.5,2.5]));
+	wall3.updateScale(new Vector3([2.51,2.5,1]));
 	wall3Parent.children.push(wall3);
 	wall3Parent.updatePos(new Vector3([-9.8,-2.8,0]));
 
@@ -1998,8 +2164,10 @@ function main () {	// eslint-disable-line no-unused-vars
 	wall2.textures.push(wallText);
 	wall3.textures.push(wallText);
 	wall4.textures.push(wallText);
-
-
+	wall1.normalTexture = wallNormalText;
+	wall2.normalTexture = wallNormalText;
+	wall3.normalTexture = wallNormalText;
+	wall4.normalTexture = wallNormalText;
 	Scene1.walls = wallsRoot;
 
 	// #endregion walls
@@ -2012,9 +2180,21 @@ function main () {	// eslint-disable-line no-unused-vars
 	floor.children.push(sofa2);
 	floor.children.push(sofa3);
 
-	Scene1.cushions = [];
-	Scene1.cushions.push(cushion1);
-	Scene1.cushions.push(cushion2);
+	let cushion1Parent = Scene1.newModel("Cushion1",2);
+	cushion1Parent.children.push(cushion1);
+	let cushion2Parent = Scene1.newModel("Cushion2",2);
+	cushion2Parent.children.push(cushion2);
+	cushion1.updateScale(new Vector3([0.6,0.6,0.6]));
+	cushion2.updateScale(new Vector3([0.6,0.6,0.6]));
+	cushion1Parent.updatePos(new Vector3([8.7,0,2]));
+
+	cushion2Parent.updatePos(new Vector3([8.7,0,-1.5]));
+
+
+	sofa1.addChild(cushion1Parent);
+	sofa1.addChild(cushion2Parent);
+
+	Scene1.cushions = [cushion1Parent,cushion2Parent];
 	Scene1.chair = ChairParent;
 
 	// #endregion Scene Graph
@@ -2069,18 +2249,8 @@ function main () {	// eslint-disable-line no-unused-vars
 		}
 		if (keypressed["67"]) {
 
-			// c pressed
-			// alternates shader
-			Scene1.activeFS = (1 + Scene1.activeFS) % Scene1.fragmentShaders.length;
-
-			if (!Scene1.changeShader()) {
-
-				console.log("Failed to intialize shaders.");
-				return;
-
-			}
-
-			Scene1.getShaderLocations();
+			Scene1.ToonShading = !Scene1.ToonShading;
+			Scene1.gl.uniform1i(Scene1.program.u_UseToonShading, Scene1.ToonShading);
 
 		}
 		if (keypressed["78"]) {
@@ -2109,3 +2279,5 @@ function main () {	// eslint-disable-line no-unused-vars
 	window.requestAnimationFrame(update);
 
 }
+
+
