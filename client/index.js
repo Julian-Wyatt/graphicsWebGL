@@ -407,7 +407,7 @@ class Scene {
 		}
 		// updates the new light position and light colour to the shader program
 		this.gl.uniform3f(this.program.u_LightPosition, this.lightPosition.elements[0],this.lightPosition.elements[1], this.lightPosition.elements[2]);
-		
+
 		this.gl.uniform3f(this.program.u_LightColor, 1 * this.lightScalar, 1 * this.lightScalar, 1 * this.lightScalar);
 
 	}
@@ -1371,13 +1371,17 @@ class Texture {
 		this.textureBuffer = gl.createTexture();
 		this.textureBuffer.img = new Image();
 		this.textureBuffer.img.src = "/Texture/" + this.name;
-		if (normal){
+		if (normal) {
+
 			this.normal = normal;
+
 		}
 		else{
+
 			this.normal = false;
+
 		}
-		
+
 		// console.trace(this.normal);
 
 		let callbackObj = this;
@@ -1751,8 +1755,8 @@ function update (currTime) {
 			Scene1.fitting.children[0].rotation.elements[0] = 0;
 			Scene1.fitting.children[0].children[0].rotation.elements[0] = 0;
 			Scene1.fitting.children[0].children[0].children[0].rotation.elements[0] = 0;
-					Scene1.fitting.updateModelMatrix();
-		Scene1.fitting.updateChildren(0.25);
+			Scene1.fitting.updateModelMatrix();
+			Scene1.fitting.updateChildren(0.25);
 
 
 		}
@@ -1874,8 +1878,6 @@ function printMatrix (mat,name,round) {	// eslint-disable-line no-unused-vars
 	console.log("--------------END--------------");
 
 }
-
-
 
 
 let Scene1;
