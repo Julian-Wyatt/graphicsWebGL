@@ -211,10 +211,16 @@ app.get("/Texture/wall",function (req,res) {
 	res.sendFile(path.join(__dirname, "Textures", "wall.jpg"));
 
 });
+app.get("/Texture/wallNormal",function (req,res) {
+
+	res.sendFile(path.join(__dirname, "Textures", "wallNormal.jpg"));
+
+});
 app.get("/Texture/metal",function (req,res) {
 
 	res.sendFile(path.join(__dirname, "Textures", "metal.png"));
 
 });
+
 
 app.listen(8000);
