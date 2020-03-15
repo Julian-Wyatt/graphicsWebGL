@@ -3,7 +3,9 @@ Computer Graphics coursework - Year 2 Durham University
 
 ## Running the program
 
-In current working directory, in the terminal, run npm install
+Firstly, ensure node package manager is installed on your system.
+
+Then, in the current working directory, in the terminal, run npm install
 
 Then run npm start
 
