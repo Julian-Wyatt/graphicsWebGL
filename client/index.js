@@ -16,8 +16,8 @@ attribute vec2 a_TexCoords;
 uniform mat4 u_ModelMatrix;
 uniform mat4 u_NormalMatrix;
 uniform mat4 u_VPMatrix;
-uniform vec3 u_LightColor;     // Light color
-uniform vec3 u_LightPosition; // Light direction (in the world coordinate, normalized)
+// uniform vec3 u_LightColor;     // Light color
+// uniform vec3 u_LightPosition; // Light direction (in the world coordinate, normalized)
 uniform vec3 u_AmbientLight;
 uniform bool u_isLighting;
 varying vec4 v_Color;
@@ -88,8 +88,8 @@ let FSHADER_SOURCE = `
 precision mediump float;
 #endif
 uniform bool u_UseTextures;    // Texture enable/disable flag
-uniform vec3 u_LightColor;	// light colour
-uniform vec3 u_LightPosition;	// position of the light source
+uniform vec3 u_LightColor[2];	// light colour
+uniform vec3 u_LightPosition[2];	// position of the light source
 uniform vec3 u_AmbientLight; 	// ambient light colour
 uniform bool u_UseToonShading;
 uniform bool u_UseNormalMap;
@@ -110,7 +110,7 @@ void main() {
 
 	// Calculate the light direction and make it 1.0 in length
 
-	vec3 lightDirection = normalize(u_LightPosition - v_Position);
+	vec3 lightDirection;
 	// vec3 lightDirection = normalize(lightPos - v_Position);
 
 	float normalDiffuse = 1.0;
@@ -121,29 +121,40 @@ void main() {
 		normalDiffuse = 1.0+ (dot(direction,normalMap));
 	}
 
+	vec3 outputLight;
+	for (int i=0;i<2;i++){
+		lightDirection = normalize(u_LightPosition[i] - v_Position);
+		float nDotL = max(dot(lightDirection,normal),0.0);
+
+		if (u_UseToonShading)
+		{
+	
+			const float A = 0.1;
+			const float B = 0.3;
+			const float C = 0.5;
+			const float D = 0.8;
+			const float F = 1.0;
+	
+			if (nDotL < A) nDotL = 0.0;
+			else if (nDotL < B) nDotL = B;
+			else if (nDotL < C) nDotL = C;
+			else if (nDotL < D) nDotL = D;
+			else nDotL = F;
+	
+		}
+		outputLight += nDotL * u_LightColor[i].rgb;
+	}
+
+
+
 
 	// The dot product of the light direction and the normal
 
-	float nDotL = max(dot(lightDirection,normal),0.0);
+	
 	// Calculate the final color from diffuse and ambient reflection
 	vec3 ambient = u_AmbientLight * v_Color.rgb;
 
-	if (u_UseToonShading)
-	{
 
-		const float A = 0.1;
-		const float B = 0.3;
-		const float C = 0.5;
-		const float D = 0.8;
-		const float F = 1.0;
-
-		if (nDotL < A) nDotL = 0.0;
-		else if (nDotL < B) nDotL = B;
-		else if (nDotL < C) nDotL = C;
-		else if (nDotL < D) nDotL = D;
-		else nDotL = F;
-
-	}
 	vec3 diffuse;
 	if (u_UseTextures) {
 		vec3 albedo = texture2D(u_Sampler, v_TexCoords).rgb;
@@ -156,7 +167,7 @@ void main() {
 		}
 		else {
 
-			diffuse = u_LightColor.rgb * nDotL * 1.0 * normalDiffuse;
+			diffuse = outputLight * 1.0 * normalDiffuse;
 			gl_FragColor = vec4(diffuse * albedo + ambient , v_Color.a);
 		}
 
@@ -164,7 +175,7 @@ void main() {
 
 	} else {
 
-		vec3 diffuse = u_LightColor.rgb * vec3(0.8,0.8,0.8) * nDotL;
+		vec3 diffuse = outputLight * vec3(0.8,0.8,0.8);
 		gl_FragColor = vec4(diffuse + ambient, v_Color.a);
 	}
 }
@@ -207,17 +218,17 @@ class Scene {
 		this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 		this.getShaderLocations();
 
-		this.lightScalar = 0.6;
+		this.lightScalar = 0.2;
 		// set the light colour for flickering light
 		this.gl.uniform3f(this.program.u_LightColor, 1 * this.lightScalar, 1 * this.lightScalar, 1 * this.lightScalar);
-
+		this.gl.uniform3f(this.program.u_LampColor, 0.3,0.3, 0.3);
 		// Calculate the view matrix and the projection matrix
 		// Multiply them and pass through to shader program - Acts as precalculation to save work on shader prorgam
 
 		this.eye = new Eye(1.1,4,10);
 
 		this.viewMatrix.setLookAt(this.eye.x, this.eye.y, this.eye.z, 0, 0, 0, 0, 1.0, 0.0);
-		this.projMatrix.setPerspective(90, this.canvas.width / this.canvas.height, 1, 165);
+		this.projMatrix.setPerspective(90, this.canvas.width / this.canvas.height, 1, 170);
 
 		this.VPMatrix.set(this.projMatrix).multiply(this.viewMatrix);
 
@@ -227,6 +238,8 @@ class Scene {
 		this.depth = -25;
 		this.textures = [];
 
+		// Set default lighting boolean and position
+		this.lampPosition = new Vector3([8,8,8]);
 
 	}
 	/**
@@ -288,8 +301,10 @@ class Scene {
 		this.program.u_ModelMatrix = this.gl.getUniformLocation(this.program, "u_ModelMatrix");
 		this.program.u_NormalMatrix = this.gl.getUniformLocation(this.program,"u_NormalMatrix");
 		this.program.u_VPMatrix = this.gl.getUniformLocation(this.program,"u_VPMatrix");
-		this.program.u_LightColor = this.gl.getUniformLocation(this.program, "u_LightColor");
-		this.program.u_LightPosition = this.gl.getUniformLocation(this.program, "u_LightPosition");
+		this.program.u_LightColor = this.gl.getUniformLocation(this.program, "u_LightColor[0]");
+		this.program.u_LampColor = this.gl.getUniformLocation(this.program, "u_LightColor[1]");
+		this.program.u_LightPosition = this.gl.getUniformLocation(this.program, "u_LightPosition[0]");
+		this.program.u_LampPosition = this.gl.getUniformLocation(this.program, "u_LightPosition[1]");
 		this.program.u_AmbientLight = this.gl.getUniformLocation(this.program, "u_AmbientLight");
 
 		// Trigger using lighting or not
@@ -304,7 +319,13 @@ class Scene {
 
 		if (!this.program.u_LightPosition) {
 
-			console.log("Failed to Get the storage locations of u_lightPositionMatrix,");
+			console.log("Failed to Get the storage locations of u_lightPosition 0");
+			return;
+
+		}
+		if (!this.program.u_LampPosition) {
+
+			console.log("Failed to Get the storage locations of u_lightPosition 1");
 			return;
 
 		}
@@ -427,6 +448,7 @@ class Scene {
 		}
 		// updates the new light position and light colour to the shader program
 		this.gl.uniform3f(this.program.u_LightPosition, this.lightPosition.elements[0],this.lightPosition.elements[1], this.lightPosition.elements[2]);
+		// this.gl.uniform3f(this.program.u_LampPosition, this.lampPosition.elements[0],this.lampPosition.elements[1], this.lampPosition.elements[2]);
 
 		this.gl.uniform3f(this.program.u_LightColor, 1 * this.lightScalar, 1 * this.lightScalar, 1 * this.lightScalar);
 
@@ -1708,6 +1730,7 @@ function update (currTime) {
 
 	// calculates delta time
 	deltaTime = (currTime - lastTime) / 1000;
+	Scene1.lampPosition.elements[0] += deltaTime;
 
 	if (!ranStartAnimation) {
 
@@ -1974,6 +1997,8 @@ function main () {	// eslint-disable-line no-unused-vars
 
 	});
 
+	// #region Textures
+
 	let woodText = Scene1.newTexture("wood");
 	let floorText = Scene1.newTexture("floor");
 	let sofa1Text = Scene1.newTexture("sofa1");
@@ -1982,6 +2007,7 @@ function main () {	// eslint-disable-line no-unused-vars
 	let sofa2NormalText = Scene1.newTexture("sofa2Normal",1);
 	let ceramic = Scene1.newTexture("ceramic");
 	let shadeText = Scene1.newTexture("shade");
+	let skyboxText = Scene1.newTexture("skybox",2);
 
 	let TVtext1 = Scene1.newTexture("TV1",2);
 	let TVtext2 = Scene1.newTexture("TV2",2);
@@ -1994,11 +2020,9 @@ function main () {	// eslint-disable-line no-unused-vars
 	let tableText = Scene1.newTexture("fabric");
 	let tableNormalText = Scene1.newTexture("fabricNormal",1);
 
-	let skyboxText = Scene1.newTexture("skybox",2);
-	let skybox = Scene1.newModel("skybox",0);
-	skybox.textures.push(skyboxText,2);
-	skybox.updateScale(new Vector3([60,60,60]));
-	skybox.updatePos(new Vector3([0,35,0]));
+
+	// #endregion Textures
+
 
 	// #region floor light
 
@@ -2008,6 +2032,7 @@ function main () {	// eslint-disable-line no-unused-vars
 	let stand = Scene1.newModel("lampStand",0);
 	let shade1 = Scene1.newModel("shade",0);
 	let bulb1 = Scene1.newModel("bulb",0);
+
 	lampParentParent.addChild(lampParent);
 	lampParent.addChild(base);
 	base.addChild(stand);
@@ -2030,9 +2055,12 @@ function main () {	// eslint-disable-line no-unused-vars
 	bulb1.textures.push(ceramic);
 	base.textures.push(woodText);
 	stand.textures.push(woodText);
-	
 
+	Scene1.lampPosition.elements[0] = bulb1.modelMatrix.elements[12];
+	Scene1.lampPosition.elements[1] = bulb1.modelMatrix.elements[13] - 2;
+	Scene1.lampPosition.elements[2] = bulb1.modelMatrix.elements[14];
 
+	Scene1.gl.uniform3f(Scene1.program.u_LampPosition, Scene1.lampPosition.elements[0],Scene1.lampPosition.elements[1],Scene1.lampPosition.elements[2]);
 
 	// #endregion floor light
 
@@ -2065,11 +2093,13 @@ function main () {	// eslint-disable-line no-unused-vars
 
 
 	tableParent.updateScale(new Vector3([1,1,0.85]));
-	tableParent.children.push(plate);
-	tableParent.children.push(mug);
+	tableParent.addChild(plate);
+	tableParent.addChild(mug);
 
 	// #endregion Table
 
+
+	// #region Chairs
 	let ChairParent = Scene1.newModel("chairParent",2);
 	let chairBack = Scene1.newModel("tableTop",0);
 	let chairSeat = Scene1.newModel("tableTop",0);
@@ -2114,6 +2144,9 @@ function main () {	// eslint-disable-line no-unused-vars
 	Chair2Parent.updateScale(new Vector3([0.5,0.55,0.6]));
 	// Chair2Parent.updatePos(new Vector3([0,-1.3,5.4]));
 	// -5.4 to -7.5
+	// #endregion
+
+
 	// #region sofas
 
 	let sofa1 = Scene1.newModel("sofa1",0);
@@ -2146,9 +2179,41 @@ function main () {	// eslint-disable-line no-unused-vars
 
 	cushion1.textures.push(shadeText);
 	cushion2.textures.push(shadeText);
+
+	let footRest = Scene1.newModel("footRest",0);
+	let footRestBase = Scene1.newModel("cube",1);
+	footRestBase.textures.push(woodText);
+	footRest.updateScale(new Vector3([2.5,2.5,2.5]));
+	footRestBase.addChild(footRest);
+	footRest.updatePos(new Vector3([0,0.6,0]));
+	footRestBase.updatePos(new Vector3([4.2,-2,1.7]));
+	footRestBase.updateScale(new Vector3([0.7,0.7,0.7]));
+
+
+	footRest.normalTexture = sofa2NormalText;
+	footRest.textures.push(sofa2);
+
+
+	let cushion1Parent = Scene1.newModel("Cushion1",2);
+	cushion1Parent.addChild(cushion1);
+	let cushion2Parent = Scene1.newModel("Cushion2",2);
+	cushion2Parent.addChild(cushion2);
+	cushion1.updateScale(new Vector3([0.6,0.6,0.6]));
+	cushion2.updateScale(new Vector3([0.6,0.6,0.6]));
+	cushion1Parent.updatePos(new Vector3([8.7,0,2]));
+
+	cushion2Parent.updatePos(new Vector3([8.7,0,-1.5]));
+
+
+	sofa1.addChild(cushion1Parent);
+	sofa1.addChild(cushion2Parent);
+
+	Scene1.cushions = [cushion1Parent,cushion2Parent];
+	Scene1.chair = ChairParent;
 	// #endregion sofas
 
 
+	// #region TV
 	let TVStand = Scene1.newModel("TV_Stand",0);
 	TVStand.updatePos(new Vector3([-8,-1.7,3.6]));
 	TVStand.updateScale(new Vector3([0.8,0.9,1]));
@@ -2164,22 +2229,18 @@ function main () {	// eslint-disable-line no-unused-vars
 	TV.textures.push(TVtext3);
 	TV.textures.push(TVtext4);
 
-
-
 	let soundbar = Scene1.newModel("Soundbar",0);
 	soundbar.updatePos(new Vector3([-8,-1.5,-0.2]));
 	soundbar.updateScale(new Vector3([0.5,0.5,0.4]));
 	soundbar.textures.push(TVtext4);
 
-	TVStand.children.push(soundbar);
-	TVStand.children.push(TV);
+	TVStand.addChild(soundbar);
+	TVStand.addChild(TV);
 
-	let floor = Scene1.newModel("quad",0);
-	floor.updatePos(new Vector3([0,-3,0]));
-	floor.updateScale(new Vector3([10,1,10]));
+	// #endregion TV
 
-	floor.textures.push(floorText);
 
+	// #region overhead light
 
 	let lightFitting = Scene1.newModel("fitting",2);
 
@@ -2190,11 +2251,11 @@ function main () {	// eslint-disable-line no-unused-vars
 
 	let bulb = Scene1.newModel("bulb",0);
 	let shade = Scene1.newModel("shade",0);
-	lightFitting.children.push(cable1);
-	cable1.children.push(cable2);
-	cable2.children.push(cable3);
-	cable3.children.push(bulb);
-	cable3.children.push(shade);
+	lightFitting.addChild(cable1);
+	cable1.addChild(cable2);
+	cable2.addChild(cable3);
+	cable3.addChild(bulb);
+	cable3.addChild(shade);
 
 	bulb.updateRot(new Vector3([180,0,0]));
 	bulb.updateScale(new Vector3([0.6,0.6,0.6]));
@@ -2216,6 +2277,9 @@ function main () {	// eslint-disable-line no-unused-vars
 	bulb.textures.push(ceramic);
 	shade.textures.push(shadeText);
 
+	// #endregion overhead light
+
+
 	// #region walls
 	let wallsRoot = Scene1.newModel("wallRoot",2);
 
@@ -2224,41 +2288,41 @@ function main () {	// eslint-disable-line no-unused-vars
 	wall1.updateRot(new Vector3([0,90,0]));
 	wall1.updateScale(new Vector3([2.51,2.5,1]));
 
-	wall1Parent.children.push(wall1);
+	wall1Parent.addChild(wall1);
 
 	wall1Parent.updatePos(new Vector3([9.8,-2.8,0]));
 
 
-	wallsRoot.children.push(wall1Parent);
+	wallsRoot.addChild(wall1Parent);
 
 	let wall2Parent = Scene1.newModel("wall2Parent",2);
 	let wall2 =  Scene1.newModel("wall",0);
 
 	wall2.updateScale(new Vector3([2.51,2.5,1]));
-	wall2Parent.children.push(wall2);
+	wall2Parent.addChild(wall2);
 	wall2Parent.updatePos(new Vector3([0,-2.8,9.8]));
 
-	wallsRoot.children.push(wall2Parent);
+	wallsRoot.addChild(wall2Parent);
 
 	let wall3Parent = Scene1.newModel("wall3Parent",2);
 	let wall3 =  Scene1.newModel("wall",0);
 
 	wall3.updateRot(new Vector3([0,90,0]));
 	wall3.updateScale(new Vector3([2.51,2.5,1]));
-	wall3Parent.children.push(wall3);
+	wall3Parent.addChild(wall3);
 	wall3Parent.updatePos(new Vector3([-9.8,-2.8,0]));
 
-	wallsRoot.children.push(wall3Parent);
+	wallsRoot.addChild(wall3Parent);
 
 	let wall4Parent = Scene1.newModel("wall4Parent",2);
 	let wall4 =  Scene1.newModel("wall",0);
 
 
 	wall4.updateScale(new Vector3([2.51,2.5,1]));
-	wall4Parent.children.push(wall4);
+	wall4Parent.addChild(wall4);
 	wall4Parent.updatePos(new Vector3([0,-2.8,-9.8]));
 
-	wallsRoot.children.push(wall4Parent);
+	wallsRoot.addChild(wall4Parent);
 
 	wall1.textures.push(wallText);
 	wall2.textures.push(wallText);
@@ -2272,30 +2336,30 @@ function main () {	// eslint-disable-line no-unused-vars
 
 	// #endregion walls
 
-	floor.children.push(wallsRoot);
-	floor.children.push(tableParent);
-	floor.children.push(TVStand);
-	floor.children.push(lightFitting);
-	floor.children.push(sofa1);
-	floor.children.push(sofa2);
-	floor.children.push(sofa3);
 
-	let cushion1Parent = Scene1.newModel("Cushion1",2);
-	cushion1Parent.children.push(cushion1);
-	let cushion2Parent = Scene1.newModel("Cushion2",2);
-	cushion2Parent.children.push(cushion2);
-	cushion1.updateScale(new Vector3([0.6,0.6,0.6]));
-	cushion2.updateScale(new Vector3([0.6,0.6,0.6]));
-	cushion1Parent.updatePos(new Vector3([8.7,0,2]));
+	let floor = Scene1.newModel("quad",0);
+	floor.updatePos(new Vector3([0,-3,0]));
+	floor.updateScale(new Vector3([10,1,10]));
 
-	cushion2Parent.updatePos(new Vector3([8.7,0,-1.5]));
+	floor.textures.push(floorText);
 
+	floor.addChild(wallsRoot);
+	floor.addChild(tableParent);
+	floor.addChild(TVStand);
+	floor.addChild(lightFitting);
+	floor.addChild(sofa1);
+	floor.addChild(sofa2);
+	floor.addChild(sofa3);
+	floor.addChild(Chair2Parent);
+	floor.addChild(ChairParent);
+	floor.addChild(lampParentParent);
 
-	sofa1.addChild(cushion1Parent);
-	sofa1.addChild(cushion2Parent);
+	let skybox = Scene1.newModel("skybox",0);
+	skybox.textures.push(skyboxText,2);
+	skybox.updateScale(new Vector3([60,60,60]));
+	skybox.updatePos(new Vector3([0,35,0]));
 
-	Scene1.cushions = [cushion1Parent,cushion2Parent];
-	Scene1.chair = ChairParent;
+	skybox.addChild(floor);
 
 	// #endregion Scene Graph
 
@@ -2375,6 +2439,76 @@ function main () {	// eslint-disable-line no-unused-vars
 		keypressed[ev.keyCode] = false;
 
 	};
+
+
+	let channelButton = document.getElementById("channelBtn");
+	channelButton.addEventListener("click",function () {
+
+		TV.changeTexture();
+
+	});
+
+	let flickerBox = document.getElementById("flickerBox");
+	flickerBox.addEventListener("change",function () {
+
+		// lights start to flicker - see update function
+		lightAnimation = !lightAnimation;
+		if (!lightAnimation) {
+
+			Scene1.lightScalar = 0.65;
+
+		}
+		else{
+
+			deltaFlash = Math.random();
+			Scene1.lightScalar = Math.random() * (0.6) + 0.1;
+
+		}
+
+	});
+
+	let changeStyle = document.getElementById("styleBtn");
+	changeStyle.addEventListener("click", function () {
+
+		Scene1.ToonShading = !Scene1.ToonShading;
+		Scene1.gl.uniform1i(Scene1.program.u_UseToonShading, Scene1.ToonShading);
+
+	});
+
+	let cushionSpin = document.getElementById("cushionBtn");
+	cushionSpin.addEventListener("click", function () {
+
+		// Rotate cushion animation
+		cushionAnimation = true;
+
+	});
+
+	let chairMove = document.getElementById("chairMoveBtn");
+	chairMove.addEventListener("click", function () {
+
+		// Move Chair animation
+		if (chairAnimation == false) {
+
+			chairAnimation = true;
+
+		}
+
+	});
+
+	let sway = document.getElementById("sway");
+	sway.addEventListener("click", function () {
+
+		// Starts swaying of light in random direction and magnitude
+		if (lightMoveAnimation == false) {
+
+			lightMoveAnimation = true;
+			dirX = Math.random() * 2 - 1;
+			dirZ = Math.random() * 2 - 1;
+
+		}
+
+	});
+
 
 	window.requestAnimationFrame(update);
 
