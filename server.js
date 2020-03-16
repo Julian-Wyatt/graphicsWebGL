@@ -180,6 +180,15 @@ app.get("/lampStand",function (req,res) {
 	});
 
 });
+app.get("/footRest",function (req,res) {
+
+	fs.readFile(path.join(__dirname, "Models", "footRest.obj"),function (err,data) {
+
+		res.send(data);
+
+	});
+
+});
 app.get("/skybox",function (req,res) {
 
 	fs.readFile(path.join(__dirname, "Models", "skybox.obj"),function (err,data) {
