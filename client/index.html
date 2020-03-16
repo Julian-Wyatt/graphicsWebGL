@@ -3,19 +3,64 @@
   <head>
     <meta charset="utf-8" />
     <title>Living Room</title>
-  </head>
-
-  <body onload="main()">
-	<canvas id="webgl" width="1500" height="1000">
-    Please use a browser that supports "canvas"
-    </canvas>
-
-    <script src="lib/webgl-utils.js"></script>
+	<script src="lib/webgl-utils.js"></script>
     <script src="lib/webgl-debug.js"></script>
     <script src="lib/cuon-utils.js"></script>
 	<script src="/lib/cuon-matrix.js"></script>
 	<script src="/lib/gl-matrix.js"></script>
 	<script src="index.js"></script>
+	<link href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css" rel="stylesheet" type="text/css" />
+           
+  </head>
+
+  <body onload="main()">
+
+
+
+	 <h1 class="ui block header" align="center" style="margin-left:20px; margin-right:20px">
+                Welcome to The Living Room!!
+            </h1>
+			<div class="ui message" style="margin-left:2em; margin-right:2em" >
+				
+				<div class="header" >
+					Instructions are as follows: 
+				</div>
+				<p>Move around room with arrow keys<br>Zoom in with w and out with s
+				</p>
+				</div>
+            <div class="ui segment">
+                <div class="ui two column grid">
+                    <div class="twelve wide column">
+                        <div class="ui segment" id="glWidthParent">
+                            	 <!-- <canvas id="webgl" width="1500" height="1000"> -->
+								 <canvas id="webgl" >
+								Please use a browser that supports "canvas"
+								</canvas>   
+                        </div> 
+                    </div>
+
+                    <div class="four wide column">
+                            <button class="fluid ui button" id="channelBtn">Change Channel / t</button>
+							<br>
+
+                            <button class="fluid ui button" id="cushionBtn">Make cushions spin / b</button>
+							<br>
+                            <button class="fluid ui button" id="styleBtn">Change Style of lighting / c</button>
+                            <br>
+							<button class="fluid ui button" id="chairMoveBtn">Move Chair / n</button>
+                            <br>
+							<button class="fluid ui button" id="sway">Move Light / m</button>
+                            <br>
+							<div class="ui toggle checkbox">
+								<input type="checkbox" id = "flickerBox">
+								<label>Make Light Flicker / l</label>
+							</div>
+                            
+                    </div>
+
+            </div>
+        </div>
+
 
   </body>
 </html>
