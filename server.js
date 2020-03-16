@@ -246,26 +246,6 @@ app.get("/Texture/TV4",function (req,res) {
 	res.sendFile(path.join(__dirname, "Textures", "TV4.png"));
 
 });
-app.get("/Texture/emissive/TV1",function (req,res) {
-
-	res.sendFile(path.join(__dirname, "Textures", "TV1emissive.png"));
-
-});
-app.get("/Texture/emissive/TV2",function (req,res) {
-
-	res.sendFile(path.join(__dirname, "Textures", "TV2emissive.png"));
-
-});
-app.get("/Texture/emissive/TV3",function (req,res) {
-
-	res.sendFile(path.join(__dirname, "Textures", "TV3emissive.png"));
-
-});
-app.get("/Texture/emissive/TV4",function (req,res) {
-
-	res.sendFile(path.join(__dirname, "Textures", "TV4emissive.png"));
-
-});
 app.get("/Texture/wall",function (req,res) {
 
 	res.sendFile(path.join(__dirname, "Textures", "wall.jpg"));
