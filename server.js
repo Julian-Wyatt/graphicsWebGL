@@ -153,12 +153,47 @@ app.get("/cushion",function (req,res) {
 	});
 
 });
+app.get("/table",function (req,res) {
 
+	fs.readFile(path.join(__dirname, "Models", "table.obj"),function (err,data) {
+
+		res.send(data);
+
+	});
+
+});
+app.get("/lampBase",function (req,res) {
+
+	fs.readFile(path.join(__dirname, "Models", "lampBase.obj"),function (err,data) {
+
+		res.send(data);
+
+	});
+
+});
+app.get("/lampStand",function (req,res) {
+
+	fs.readFile(path.join(__dirname, "Models", "lampStand.obj"),function (err,data) {
+
+		res.send(data);
+
+	});
+
+});
+app.get("/skybox",function (req,res) {
+
+	fs.readFile(path.join(__dirname, "Models", "skybox.obj"),function (err,data) {
+
+		res.send(data);
+
+	});
+
+});
 
 // Textures
-app.get("/Texture/carpet",function (req,res) {
+app.get("/Texture/floor",function (req,res) {
 
-	res.sendFile(path.join(__dirname, "Textures", "carpet.jpg"));
+	res.sendFile(path.join(__dirname, "Textures", "floor.jpg"));
 
 });
 app.get("/Texture/sofa1",function (req,res) {
@@ -171,9 +206,14 @@ app.get("/Texture/sofa2",function (req,res) {
 	res.sendFile(path.join(__dirname, "Textures", "sofa2.jpg"));
 
 });
-app.get("/Texture/table",function (req,res) {
+app.get("/Texture/sofa2Normal",function (req,res) {
 
-	res.sendFile(path.join(__dirname, "Textures", "table.png"));
+	res.sendFile(path.join(__dirname, "Textures", "sofa2Normal.jpg"));
+
+});
+app.get("/Texture/wood",function (req,res) {
+
+	res.sendFile(path.join(__dirname, "Textures", "wood.png"));
 
 });
 app.get("/Texture/ceramic",function (req,res) {
@@ -206,6 +246,26 @@ app.get("/Texture/TV4",function (req,res) {
 	res.sendFile(path.join(__dirname, "Textures", "TV4.png"));
 
 });
+app.get("/Texture/emissive/TV1",function (req,res) {
+
+	res.sendFile(path.join(__dirname, "Textures", "TV1emissive.png"));
+
+});
+app.get("/Texture/emissive/TV2",function (req,res) {
+
+	res.sendFile(path.join(__dirname, "Textures", "TV2emissive.png"));
+
+});
+app.get("/Texture/emissive/TV3",function (req,res) {
+
+	res.sendFile(path.join(__dirname, "Textures", "TV3emissive.png"));
+
+});
+app.get("/Texture/emissive/TV4",function (req,res) {
+
+	res.sendFile(path.join(__dirname, "Textures", "TV4emissive.png"));
+
+});
 app.get("/Texture/wall",function (req,res) {
 
 	res.sendFile(path.join(__dirname, "Textures", "wall.jpg"));
@@ -221,6 +281,20 @@ app.get("/Texture/metal",function (req,res) {
 	res.sendFile(path.join(__dirname, "Textures", "metal.png"));
 
 });
+app.get("/Texture/fabric",function (req,res) {
 
+	res.sendFile(path.join(__dirname, "Textures", "fabric.jpg"));
+
+});
+app.get("/Texture/fabricNormal",function (req,res) {
+
+	res.sendFile(path.join(__dirname, "Textures", "fabricNormal.jpg"));
+
+});
+app.get("/Texture/skybox",function (req,res) {
+
+	res.sendFile(path.join(__dirname, "Textures", "skybox.png"));
+
+});
 
 app.listen(8000);
