@@ -94,6 +94,7 @@ uniform vec3 u_AmbientLight; 	// ambient light colour
 uniform bool u_UseToonShading;
 uniform bool u_UseNormalMap;
 uniform mat4 u_ModelMatrix;
+uniform bool u_IsEmissive;
 uniform sampler2D u_normalTextureSampler;
 varying vec3 v_Normal;
 varying vec3 v_Position;
@@ -147,9 +148,18 @@ void main() {
 	if (u_UseTextures) {
 		vec3 albedo = texture2D(u_Sampler, v_TexCoords).rgb;
 		
-		diffuse = u_LightColor.rgb * nDotL * 1.0 * normalDiffuse;
+		
 
-		gl_FragColor = vec4(diffuse * albedo + ambient , v_Color.a);
+		if (u_IsEmissive){
+			
+			gl_FragColor = vec4(albedo + ambient, v_Color.a);
+		}
+		else {
+
+			diffuse = u_LightColor.rgb * nDotL * 1.0 * normalDiffuse;
+			gl_FragColor = vec4(diffuse * albedo + ambient , v_Color.a);
+		}
+
 
 
 	} else {
@@ -207,7 +217,7 @@ class Scene {
 		this.eye = new Eye(1.1,4,10);
 
 		this.viewMatrix.setLookAt(this.eye.x, this.eye.y, this.eye.z, 0, 0, 0, 0, 1.0, 0.0);
-		this.projMatrix.setPerspective(90, this.canvas.width / this.canvas.height, 1, 100);
+		this.projMatrix.setPerspective(90, this.canvas.width / this.canvas.height, 1, 165);
 
 		this.VPMatrix.set(this.projMatrix).multiply(this.viewMatrix);
 
@@ -336,6 +346,14 @@ class Scene {
 			return;
 
 		}
+
+		this.program.u_IsEmissive = this.gl.getUniformLocation(this.program, "u_IsEmissive");
+		if (!this.program.u_IsEmissive) {
+
+			console.log("Failed to get the storage location for emissive texture flag");
+			return;
+
+		}
 		// Initialise ambient light to be low to emphasise the flickering light - on click of L
 		this.gl.uniform3f(this.program.u_AmbientLight,0.05, 0.05, 0.05);
 
@@ -369,10 +387,10 @@ class Scene {
 	 * @param {String} name Name of the texture
 	 * @returns {Texture} Returns the texture instantiated
 	 */
-	newTexture (name,normal) {
+	newTexture (name,type) {
 
 
-		let text = new Texture(name,this.gl,this.textures.length,normal);
+		let text = new Texture(name,this.gl,this.textures.length,type);
 		this.textures.push(text);
 		return text;
 
@@ -461,9 +479,9 @@ class Scene {
 			// if (temp<-0.35){
 			// 	this.eye.x = -0.35;
 			// }
-			if (temp < -0.9) {
+			if (temp < -0.5) {
 
-				this.eye.x = -0.9;
+				this.eye.x = -0.5;
 
 			}
 			else{
@@ -590,7 +608,6 @@ class Model {
 		}
 
 		this.normalTexture = undefined;
-
 
 		this.children = [];
 		this.dampening = false;
@@ -818,7 +835,6 @@ class Model {
 			}
 
 		}
-
 
 		// Write data into the buffer object
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
@@ -1363,7 +1379,7 @@ class Texture {
 	 * @param {String} name name of the texture - the endpoint on the server to get the object
 	 * @param {WebGLContext} gl The gl element in the html page
 	 */
-	constructor (name,gl,pointer,normal) {
+	constructor (name,gl,pointer,type) {
 
 		this.name = name;
 		this.loaded = false;
@@ -1371,18 +1387,25 @@ class Texture {
 		this.textureBuffer = gl.createTexture();
 		this.textureBuffer.img = new Image();
 		this.textureBuffer.img.src = "/Texture/" + this.name;
-		if (normal) {
+		if (type == 1) {
 
-			this.normal = normal;
+			this.normal = true;
+			this.emissive = false;
+
+		}
+		else if (type == 2) {
+
+			this.emissive = true;
+			this.normal = false;
 
 		}
 		else{
 
+			this.emissive = false;
 			this.normal = false;
 
 		}
 
-		// console.trace(this.normal);
 
 		let callbackObj = this;
 		this.textureBuffer.img.onload = function () {
@@ -1415,8 +1438,8 @@ class Texture {
 		if (isPower2(this.textureBuffer.img.width) && isPower2(this.textureBuffer.img.height)) {
 
 			gl.generateMipmap(gl.TEXTURE_2D);
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
+			// gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+			// gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
 			// gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
 			// gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
 
@@ -1460,16 +1483,26 @@ class Texture {
 
 			if (this.normal) {
 
-				// Assign u_Sampler to TEXTURE0
+				// Assign normalSampler to pointer
 				gl.uniform1i(program.u_normalTextureSampler, this.pointer);
 				gl.uniform1i(program.u_UseNormalMap, true);
+				gl.uniform1i(program.u_IsEmissive, false);
+
+			}
+			else if (this.emissive) {
+
+				// Assign emissiveSampler to pointer
+				gl.uniform1i(program.u_Sampler, this.pointer);
+				gl.uniform1i(program.u_IsEmissive, true);
+				gl.uniform1i(program.u_UseNormalMap, false);
 
 			}
 			else{
 
-				// Assign u_Sampler to TEXTURE0
+				// Assign u_Sampler to pointer
 				gl.uniform1i(program.u_Sampler, this.pointer);
 				gl.uniform1i(program.u_UseNormalMap, false);
+				gl.uniform1i(program.u_IsEmissive, false);
 
 			}
 
@@ -1731,11 +1764,18 @@ function update (currTime) {
 		// Scene1.fitting.updateModelMatrix();
 		// Scene1.fitting.updateChildren(0.25);
 
-		Scene1.fitting.children[0].rotation.elements[0] += angle / 4; // updateRot(new Vector3([angle,0,0]));
-		Scene1.fitting.children[0].children[0].rotation.elements[0] += angle / 2;
-		Scene1.fitting.children[0].children[0].children[0].rotation.elements[0] += angle * 3 / 4;
+		// Scene1.fitting.children[0].rotation.elements[0] += angle / 4; // updateRot(new Vector3([angle,0,0]));
+		// Scene1.fitting.children[0].children[0].rotation.elements[0] += angle / 2;
+		// Scene1.fitting.children[0].children[0].children[0].rotation.elements[0] += angle * 3 / 4;
+
+		Scene1.fitting.children[0].rotation.elements[0] += angle / 4 * dirX; // updateRot(new Vector3([angle,0,0]));
+		Scene1.fitting.children[0].children[0].rotation.elements[0] += angle / 2 * dirX;
+		Scene1.fitting.children[0].children[0].children[0].rotation.elements[0] += angle * (3 / 4) * dirX;
+		Scene1.fitting.children[0].rotation.elements[2] += angle / 4 * dirZ; // updateRot(new Vector3([angle,0,0]));
+		Scene1.fitting.children[0].children[0].rotation.elements[2] += angle / 2 * dirZ;
+		Scene1.fitting.children[0].children[0].children[0].rotation.elements[2] += angle * (3 / 4) * dirZ;
 		Scene1.fitting.updateModelMatrix();
-		Scene1.fitting.updateChildren(0.25);
+		Scene1.fitting.updateChildren();
 
 		// Scene1.fitting.children[0].updateRot(new Vector3([angle * dirX,0,angle * dirZ]));
 
@@ -1755,6 +1795,9 @@ function update (currTime) {
 			Scene1.fitting.children[0].rotation.elements[0] = 0;
 			Scene1.fitting.children[0].children[0].rotation.elements[0] = 0;
 			Scene1.fitting.children[0].children[0].children[0].rotation.elements[0] = 0;
+			Scene1.fitting.children[0].rotation.elements[2] = 0;
+			Scene1.fitting.children[0].children[0].rotation.elements[2] = 0;
+			Scene1.fitting.children[0].children[0].children[0].rotation.elements[2] = 0;
 			Scene1.fitting.updateModelMatrix();
 			Scene1.fitting.updateChildren(0.25);
 
@@ -1895,11 +1938,12 @@ function main () {	// eslint-disable-line no-unused-vars
 	let canvas = document.getElementById("webgl");
 	canvas.width = (glparent.offsetWidth);
 	canvas.style.width = (glparent.offsetWidth - 28) + "px";
-	canvas.height = screen.height - 275;
+	canvas.height = screen.height - 280;
 
 
 	// Get the rendering context for WebGL
 	let gl = getWebGLContext(canvas);
+	// let gl = canvas.getContext("webgl2");
 	if (!gl) {
 
 		console.log("Failed to get the rendering context for WebGL");
@@ -1918,7 +1962,7 @@ function main () {	// eslint-disable-line no-unused-vars
 		// set new width and height of canvas
 		canvas.width = (glparent.offsetWidth);
 		canvas.style.width = (glparent.offsetWidth - 28) + "px";
-		canvas.height = window.outerHeight - 275;
+		canvas.height = window.outerHeight - 280;
 
 		// reset center of canvas
 
@@ -1928,51 +1972,79 @@ function main () {	// eslint-disable-line no-unused-vars
 
 	});
 
-	let woodText = Scene1.newTexture("table");
-	let carpet = Scene1.newTexture("carpet");
+	let woodText = Scene1.newTexture("wood");
+	let floorText = Scene1.newTexture("floor");
 	let sofa1Text = Scene1.newTexture("sofa1");
 	let sofa2Text = Scene1.newTexture("sofa2");
+
+	let sofa2NormalText = Scene1.newTexture("sofa2Normal",1);
 	let ceramic = Scene1.newTexture("ceramic");
 	let shadeText = Scene1.newTexture("shade");
 
-	let TVtext1 = Scene1.newTexture("TV1");
-	let TVtext2 = Scene1.newTexture("TV2");
-	let TVtext3 = Scene1.newTexture("TV3");
-	let TVtext4 = Scene1.newTexture("TV4");
-	let metalText = Scene1.newTexture("metal");
+	let TVtext1 = Scene1.newTexture("TV1",2);
+	let TVtext2 = Scene1.newTexture("TV2",2);
+	let TVtext3 = Scene1.newTexture("TV3",2);
+	let TVtext4 = Scene1.newTexture("TV4",2);
+
+
 	let wallText = Scene1.newTexture("wall");
-	let wallNormalText = Scene1.newTexture("wallNormal",true);
+	let wallNormalText = Scene1.newTexture("wallNormal",1);
+	let tableText = Scene1.newTexture("fabric");
+	let tableNormalText = Scene1.newTexture("fabricNormal",1);
+
+	let skyboxText = Scene1.newTexture("skybox",2);
+	let skybox = Scene1.newModel("skybox",0);
+	skybox.textures.push(skyboxText,2);
+	skybox.updateScale(new Vector3([60,60,60]));
+	skybox.updatePos(new Vector3([0,35,0]));
+
+	// #region floor light
+
+	let lampParentParent = Scene1.newModel("lampParentParent",2);
+	let lampParent = Scene1.newModel("lampParent",2);
+	let base = Scene1.newModel("lampBase",0);
+	let stand = Scene1.newModel("lampStand",0);
+	let shade1 = Scene1.newModel("shade",0);
+	let bulb1 = Scene1.newModel("bulb",0);
+	lampParentParent.addChild(lampParent);
+	lampParent.addChild(base);
+	base.addChild(stand);
+	stand.addChild(shade1);
+	shade1.addChild(bulb1);
+
+	bulb1.updateRot(new Vector3([180,0,0]));
+	bulb1.updateScale(new Vector3([0.6,0.6,0.6]));
+	bulb1.updatePos(new Vector3([0,2,0]));
+
+	stand.updatePos(new Vector3([0,-0.5,0]));
+	shade1.updateScale(new Vector3([0.3,0.3,0.3]));
+	shade1.updatePos(new Vector3([0,9.9,3]));
+
+
+	lampParent.updateRot(new Vector3([0,-45,0]));
+	lampParentParent.updatePos(new Vector3([8.3,-2.5,-8.6]));
+	lampParentParent.updateScale(new Vector3([0.9,0.8,0.9]));
+	shade1.textures.push(shadeText);
+	bulb1.textures.push(ceramic);
+	base.textures.push(woodText);
+	stand.textures.push(woodText);
+	
+
+
+
+	// #endregion floor light
 
 
 	// #region Table
 	let tableParent = Scene1.newModel("tableParent",2);
-	let tableTop = Scene1.newModel("tableTop",0);
-	let leg1 = Scene1.newModel("tableLeg",0);
-	let leg2 = Scene1.newModel("tableLeg",0);
-	let leg3 = Scene1.newModel("tableLeg",0);
-	let leg4 = Scene1.newModel("tableLeg",0);
-	tableParent.addChild(tableTop);
-	tableParent.addChild(leg1);
-	tableParent.addChild(leg2);
-	tableParent.addChild(leg3);
-	tableParent.addChild(leg4);
+	let table = Scene1.newModel("table",0);
+	table.updateRot(new Vector3([0,-90,0]));
+	table.updateScale(new Vector3([2.75,7,2.5]));
+	table.updatePos(new Vector3([0,-8.4,0]));
+	table.textures.push(tableText);
+	table.normalTexture = tableNormalText;
 
-
-	leg1.updatePos(new Vector3([3,0,8]));
-	leg1.updateScale(new Vector3([1,0.7,1]));
-
-
-	leg2.updatePos(new Vector3([-3,0,8]));
-	leg2.updateScale(new Vector3([1,0.7,1]));
-
-	leg3.updateRot(new Vector3([0,180,0]));
-	leg3.updatePos(new Vector3([-3,0,-8]));
-	leg3.updateScale(new Vector3([1,0.7,1]));
-
-
-	leg4.updateRot(new Vector3([0,180,0]));
-	leg4.updatePos(new Vector3([3,0,-8]));
-	leg4.updateScale(new Vector3([1,0.7,1]));
+	tableParent.addChild(table);
 
 
 	tableParent.updatePos(new Vector3([0,-0.9,0]));
@@ -1981,18 +2053,13 @@ function main () {	// eslint-disable-line no-unused-vars
 
 	let mug = Scene1.newModel("mug",0);
 	mug.updateScale(new Vector3([0.6,0.6,0.6]));
-	mug.updatePos(new Vector3([0,-0.9,-3.5]));
+	mug.updatePos(new Vector3([0,-0.85,-3.5]));
 	let plate = Scene1.newModel("plate",0);
 	plate.updateScale(new Vector3([1.1,1.1,1.1]));
-	plate.updatePos(new Vector3([0.8,-0.7,0]));
+	plate.updatePos(new Vector3([0.8,-0.6,0]));
 
 	mug.textures.push(ceramic);
 	plate.textures.push(ceramic);
-	leg1.textures.push(woodText);
-	leg2.textures.push(woodText);
-	leg3.textures.push(woodText);
-	leg4.textures.push(woodText);
-	tableTop.textures.push(woodText);
 
 
 	tableParent.updateScale(new Vector3([1,1,0.85]));
@@ -2005,11 +2072,11 @@ function main () {	// eslint-disable-line no-unused-vars
 	let chairBack = Scene1.newModel("tableTop",0);
 	let chairSeat = Scene1.newModel("tableTop",0);
 	let chairLeg = Scene1.newModel("tableLeg",0);
-	chairLeg.updateScale(new Vector3([1,0.2,0.8]));
+	chairLeg.updateScale(new Vector3([1,0.2,0.6]));
 	chairBack.updateRot(new Vector3([90,0,0]));
 	chairBack.updateScale(new Vector3([0.5,0.3,0.25]));
-	chairBack.updatePos(new Vector3([0,3,-1.9]));
-	chairSeat.updateScale(new Vector3([0.5,0.7,0.2]));
+	chairBack.updatePos(new Vector3([0,-1.4,-2.4]));
+	chairSeat.updateScale(new Vector3([0.5,0.7,0.15]));
 
 
 	ChairParent.addChild(chairBack);
@@ -2021,6 +2088,29 @@ function main () {	// eslint-disable-line no-unused-vars
 	chairLeg.textures.push(woodText);
 	ChairParent.updateScale(new Vector3([0.5,0.55,0.6]));
 	ChairParent.updatePos(new Vector3([0,-1.3,-5.4]));
+
+	let Chair2Parent = Scene1.newModel("chairParent",2);
+	let chair2Back = Scene1.newModel("tableTop",0);
+	let chair2Seat = Scene1.newModel("tableTop",0);
+	let chair2Leg = Scene1.newModel("tableLeg",0);
+	chair2Leg.updateScale(new Vector3([1,0.2,0.6]));
+	chair2Back.updateRot(new Vector3([90,0,0]));
+	chair2Back.updateScale(new Vector3([0.5,0.3,0.25]));
+	chair2Back.updatePos(new Vector3([0,-1.4,-2.4]));
+	chair2Seat.updateScale(new Vector3([0.5,0.7,0.15]));
+
+
+	Chair2Parent.addChild(chair2Back);
+	Chair2Parent.addChild(chair2Leg);
+	Chair2Parent.addChild(chair2Seat);
+
+	chair2Seat.textures.push(woodText);
+	chair2Back.textures.push(woodText);
+	chair2Leg.textures.push(woodText);
+	Chair2Parent.updatePos(new Vector3([0,-1.3,-6]));
+	Chair2Parent.updateRot(new Vector3([0,180,0]));
+	Chair2Parent.updateScale(new Vector3([0.5,0.55,0.6]));
+	// Chair2Parent.updatePos(new Vector3([0,-1.3,5.4]));
 	// -5.4 to -7.5
 	// #region sofas
 
@@ -2033,19 +2123,24 @@ function main () {	// eslint-disable-line no-unused-vars
 
 
 	let sofa2 = Scene1.newModel("sofa2",0);
-	sofa2.updatePos(new Vector3([5,-2.5,9.5]));
+	let sofa2Parent = Scene1.newModel("sofa2Parent",2);
+	sofa2Parent.addChild(sofa2);
 	sofa2.updateRot(new Vector3([0,-30,0]));
-	sofa2.updatePos(new Vector3([1.2,0,0]));
+	sofa2Parent.updatePos(new Vector3([5,-2.5,9.3]));
+
 
 	let sofa3 = Scene1.newModel("sofa2",0);
-	sofa3.updatePos(new Vector3([6,-2.5,-6]));
+	let sofa3Parent = Scene1.newModel("sofa3Parent",2);
+	sofa3Parent.addChild(sofa3);
 	sofa3.updateRot(new Vector3([0,30,0]));
-	sofa3.updatePos(new Vector3([2.5,0,1]));
+	sofa3Parent.updatePos(new Vector3([7.5,-2.5,-5]));
+
 
 	sofa1.textures.push(sofa1Text);
 	sofa2.textures.push(sofa2Text);
+	sofa2.normalTexture = sofa2NormalText;
 	sofa3.textures.push(sofa2Text);
-
+	sofa3.normalTexture = sofa2NormalText;
 
 	cushion1.textures.push(shadeText);
 	cushion2.textures.push(shadeText);
@@ -2068,10 +2163,11 @@ function main () {	// eslint-disable-line no-unused-vars
 	TV.textures.push(TVtext4);
 
 
+
 	let soundbar = Scene1.newModel("Soundbar",0);
 	soundbar.updatePos(new Vector3([-8,-1.5,-0.2]));
 	soundbar.updateScale(new Vector3([0.5,0.5,0.4]));
-	soundbar.textures.push(metalText);
+	soundbar.textures.push(TVtext4);
 
 	TVStand.children.push(soundbar);
 	TVStand.children.push(TV);
@@ -2080,7 +2176,7 @@ function main () {	// eslint-disable-line no-unused-vars
 	floor.updatePos(new Vector3([0,-3,0]));
 	floor.updateScale(new Vector3([10,1,10]));
 
-	floor.textures.push(carpet);
+	floor.textures.push(floorText);
 
 
 	let lightFitting = Scene1.newModel("fitting",2);
@@ -2103,13 +2199,13 @@ function main () {	// eslint-disable-line no-unused-vars
 	bulb.updatePos(new Vector3([0,-1,0]));
 	shade.updatePos(new Vector3([0,1,0]));
 
-	cable2.updatePos(new Vector3([0,-3.4,0]));
-	cable3.updatePos(new Vector3([0,-3.4,0]));
-	cable1.updatePos(new Vector3([0,-3.4,0]));
+	cable2.updatePos(new Vector3([0,-4.2,0]));
+	cable3.updatePos(new Vector3([0,-4.2,0]));
+	cable1.updatePos(new Vector3([0,-4.2,0]));
 
-	lightFitting.updatePos(new Vector3([0,15,0]));
+	lightFitting.updatePos(new Vector3([0,17,0]));
 
-	lightFitting.updateScale(new Vector3([0.4,0.4,0.4]));
+	lightFitting.updateScale(new Vector3([0.4,0.38,0.4]));
 
 	Scene1.fitting = lightFitting;
 
