@@ -4,3 +4,5 @@ node_modules
 .DS_Store
 *.mtl
 .DS_Store
+Models-Blender
+client/.DS_Store
