@@ -126,18 +126,18 @@ app.get("/lightCable",function (req,res) {
 	});
 
 });
-app.get("/tableLeg",function (req,res) {
+app.get("/chairLeg",function (req,res) {
 
-	fs.readFile(path.join(__dirname, "Models", "tableLeg.obj"),function (err,data) {
+	fs.readFile(path.join(__dirname, "Models", "chairLeg.obj"),function (err,data) {
 
 		res.send(data);
 
 	});
 
 });
-app.get("/tableTop",function (req,res) {
+app.get("/chairSeat",function (req,res) {
 
-	fs.readFile(path.join(__dirname, "Models", "tableTop.obj"),function (err,data) {
+	fs.readFile(path.join(__dirname, "Models", "chairSeat.obj"),function (err,data) {
 
 		res.send(data);
 

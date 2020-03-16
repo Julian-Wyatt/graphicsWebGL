@@ -2101,9 +2101,9 @@ function main () {	// eslint-disable-line no-unused-vars
 
 	// #region Chairs
 	let ChairParent = Scene1.newModel("chairParent",2);
-	let chairBack = Scene1.newModel("tableTop",0);
-	let chairSeat = Scene1.newModel("tableTop",0);
-	let chairLeg = Scene1.newModel("tableLeg",0);
+	let chairBack = Scene1.newModel("chairSeat",0);
+	let chairSeat = Scene1.newModel("chairSeat",0);
+	let chairLeg = Scene1.newModel("chairLeg",0);
 	chairLeg.updateScale(new Vector3([1,0.2,0.6]));
 	chairBack.updateRot(new Vector3([90,0,0]));
 	chairBack.updateScale(new Vector3([0.5,0.3,0.25]));
@@ -2122,9 +2122,9 @@ function main () {	// eslint-disable-line no-unused-vars
 	ChairParent.updatePos(new Vector3([0,-1.3,-5.4]));
 
 	let Chair2Parent = Scene1.newModel("chairParent",2);
-	let chair2Back = Scene1.newModel("tableTop",0);
-	let chair2Seat = Scene1.newModel("tableTop",0);
-	let chair2Leg = Scene1.newModel("tableLeg",0);
+	let chair2Back = Scene1.newModel("chairSeat",0);
+	let chair2Seat = Scene1.newModel("chairSeat",0);
+	let chair2Leg = Scene1.newModel("chairLeg",0);
 	chair2Leg.updateScale(new Vector3([1,0.2,0.6]));
 	chair2Back.updateRot(new Vector3([90,0,0]));
 	chair2Back.updateScale(new Vector3([0.5,0.3,0.25]));
