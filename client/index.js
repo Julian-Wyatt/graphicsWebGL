@@ -419,6 +419,8 @@ class Scene {
 					this.gl.drawElements(this.gl.TRIANGLES, this.models[i].drawingInfo.indices.length, this.gl.UNSIGNED_SHORT, 0);
 
 				}
+				this.gl.uniform1i(this.program.u_UseTextures, false);
+
 
 			}
 
