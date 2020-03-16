@@ -62,31 +62,40 @@ package.json
 package-lock.json
 README.md
 Textures
-	carpet.jpg
 	ceramic.jpg
-	metal.png
+	fabric.jpg
+	fabricNormal.jpg
+	floor.jpg
 	Shade.jpg
+	skybox.png
 	sofa1.jpg
 	sofa2.jpg
-	table.png
+	sofa2Normal.jpg
 	TV1.png
 	TV2.png
 	TV3.png
 	TV4.png
 	wall.jpg
+	wallNormal.jpg
+	wood.png
 Models
-	Bulb.obj
+	bulb.obj
+	chairLeg.obj
+	chairSeat.obj
 	cushion.obj
+	footRest.obj
+	lampBase.obj
 	lampShade.obj
+	lampStand.obj
 	lampCable.obj
 	mug.obj
 	plate.obj
 	quad.obj
+	skybox.obj
 	sofa1.obj
 	sofa2.obj
 	soundbar.obj
-	tableLeg.obj
-	tableTop.obj
+	table.obj
 	TV_Stand.obj
 	TV.obj
 	wall.obj
