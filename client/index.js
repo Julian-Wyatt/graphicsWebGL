@@ -6,9 +6,7 @@
 
 // #region shaders
 let VSHADER_SOURCE = `
-#ifdef GL_ES
 precision mediump float;
-#endif
 attribute vec4 a_Position;
 attribute vec4 a_Color;
 attribute vec4 a_Normal;       // Normal
@@ -17,14 +15,17 @@ uniform mat4 u_ModelMatrix;
 uniform mat4 u_NormalMatrix;
 uniform mat4 u_VPMatrix;
 // uniform vec3 u_LightColor;     // Light color
-// uniform vec3 u_LightPosition; // Light direction (in the world coordinate, normalized)
+uniform vec3 u_LightPosition[2];	// position of the light source
 uniform vec3 u_AmbientLight;
 uniform bool u_isLighting;
+uniform bool u_UseNormalMap;
 varying vec4 v_Color;
 varying vec3 v_Normal;
 varying vec3 v_Position;
 varying vec2 v_TexCoords;
 
+varying vec3 ts_lightPos[2];
+varying vec3 ts_FragPosition;
 
 // Common transpose function to transpose a matrix
 mat3 transpose(in mat3 inMatrix)
@@ -43,50 +44,48 @@ mat3 transpose(in mat3 inMatrix)
 }
 
 void main() {
-// '  gl_Position = u_ProjMatrix * u_ViewMatrix * u_ModelMatrix * a_Position;
-
-	gl_Position = u_VPMatrix * u_ModelMatrix * a_Position;
-	if(u_isLighting)
-	{
-	v_Position = vec3(u_ModelMatrix * a_Position);
-
-	// vec3 t; 
-	// vec3 b; 
-	// vec3 c1 = cross(a_Normal.xyz, vec3(0.0, 0.0, 1.0)); 
-	// vec3 c2 = cross(a_Normal.xyz, vec3(0.0, 1.0, 0.0)); 
-	// if (length(c1) > length(c2)){
-	// 	t = c1;	
-	// }
-	// else{
-	// 	t = c2;	
-	// }
+	// '  gl_Position = u_ProjMatrix * u_ViewMatrix * u_ModelMatrix * a_Position;
 	
-	// t = normalize(t);
-	// b = normalize(cross(a_Normal.xyz, t)); 
-	// vec3 n = normalize(cross(t,b));
-	// mat3 tbn = transpose(mat3(t,b,n));
-	// v_Position = tbn * v_Position;
-	// lightPos = tbn * u_LightPosition;
-
-	v_Normal = normalize(vec3(u_NormalMatrix * a_Normal));
-	v_Color = a_Color; 
+		gl_Position = u_VPMatrix * u_ModelMatrix * a_Position;
+		if(u_isLighting)
+		{
+		v_Position = vec3(u_ModelMatrix * a_Position);
 	
+		// vec3 t;
+		// vec3 b;
+		// vec3 c1 = cross(a_Normal.xyz, vec3(0.0, 0.0, 1.0));
+		// vec3 c2 = cross(a_Normal.xyz, vec3(0.0, 1.0, 0.0));
+		// if (length(c1) > length(c2)){
+		// 	t = c1;
+		// }
+		// else{
+		// 	t = c2;
+		// }
 
-	}
-  	else
-  	{
-    	v_Color = a_Color;
-	}
+		// t = normalize(t);
+		// b = normalize(cross(a_Normal.xyz, t));
+		// vec3 n = normalize(cross(t,b));
+		// mat3 tbn = transpose(mat3(t,b,n));
+		// v_Position = tbn * v_Position;
+		// lightPos = tbn * u_LightPosition;
+	
+		v_Normal = normalize(vec3(u_NormalMatrix * a_Normal));
+		v_Color = a_Color;
 
-	v_TexCoords = a_TexCoords;
-}
+		}
+		else
+		{
+			v_Color = a_Color;
+		}
+	
+		v_TexCoords = a_TexCoords;
+	}
 `;
 
 
 let FSHADER_SOURCE = `
-#ifdef GL_ES
+
 precision mediump float;
-#endif
 uniform bool u_UseTextures;    // Texture enable/disable flag
 uniform vec3 u_LightColor[2];	// light colour
 uniform vec3 u_LightPosition[2];	// position of the light source
@@ -101,7 +100,8 @@ varying vec3 v_Position;
 varying vec4 v_Color;
 uniform sampler2D u_Sampler;
 varying vec2 v_TexCoords;
-
+varying vec3 ts_lightPos[2];
+varying vec3 ts_FragPosition;
 
 void main() {
 	// Normalize normal because it's interpolated and not 1.0 (length)
@@ -115,9 +115,9 @@ void main() {
 
 	float normalDiffuse = 1.0;
 	if (u_UseNormalMap){
-		vec3 direction = normalize(vec3(1.0,-1.0,0.0));
+		vec3 direction = normalize(vec3(1.0,-1.0,1.0));
 		vec3 normalMap = normalize(texture2D(u_normalTextureSampler, v_TexCoords).rgb * 2.0 - 1.0 );
-		// vec3 rar = normalize(texture2D(u_normalTextureSampler, v_TexCoords).rgb * 2.0 - 1.0 );
+		
 		normalDiffuse = 1.0+ (dot(direction,normalMap));
 	}
 
@@ -662,14 +662,6 @@ class Model {
 			this.children[i].updateModelMatrix();
 			this.children[i].modelMatrix.elements = mat4.multiply(this.children[i].modelMatrix.elements,this.modelMatrix.elements,this.children[i].modelMatrix.elements);
 
-			// if (rate) {
-
-			// 	this.children[i].modelMatrix.elements = mat4.multiplyScalar(this.children[i].modelMatrix.elements,this.children[i].modelMatrix.elements,rate);
-			// 	rate = rate * 2;
-			// 	this.children[i].updateChildren(rate);
-
-			// }else {
-
 			this.children[i].updateChildren();
 
 
@@ -742,8 +734,6 @@ class Model {
 		// this.modelMatrix.rotate(this.rotation.elements[1],0,1,0);
 		// this.modelMatrix.rotate(this.rotation.elements[0],1,0,0);
 		// this.modelMatrix.rotate(this.rotation.elements[2],0,0,1);
-		this.updateChildren();
-
 
 	}
 	/**
@@ -1730,7 +1720,6 @@ function update (currTime) {
 
 	// calculates delta time
 	deltaTime = (currTime - lastTime) / 1000;
-	Scene1.lampPosition.elements[0] += deltaTime;
 
 	if (!ranStartAnimation) {
 
@@ -1782,36 +1771,23 @@ function update (currTime) {
 
 		// light sways when m is clicked
 
-		lightTime += deltaTime;
-
+		// lightTime += deltaTime;
+		lightTime += 0.016;
 		let angle = Math.cos(2 * Math.PI * lightTime) * 4 * (-(lightTime / 10 - 1) * -(lightTime / 10 - 1) * -(lightTime / 10 - 1));
-		// Scene1.fitting.children[0].rotation.elements[0] += angle; // updateRot(new Vector3([angle,0,0]));
-		// Scene1.fitting.updateModelMatrix();
-		// Scene1.fitting.updateChildren(0.25);
-
-		// Scene1.fitting.children[0].rotation.elements[0] += angle / 4; // updateRot(new Vector3([angle,0,0]));
-		// Scene1.fitting.children[0].children[0].rotation.elements[0] += angle / 2;
-		// Scene1.fitting.children[0].children[0].children[0].rotation.elements[0] += angle * 3 / 4;
-
-		Scene1.fitting.children[0].rotation.elements[0] += angle / 4 * dirX; // updateRot(new Vector3([angle,0,0]));
-		Scene1.fitting.children[0].children[0].rotation.elements[0] += angle / 2 * dirX;
-		Scene1.fitting.children[0].children[0].children[0].rotation.elements[0] += angle * (3 / 4) * dirX;
-		Scene1.fitting.children[0].rotation.elements[2] += angle / 4 * dirZ; // updateRot(new Vector3([angle,0,0]));
-		Scene1.fitting.children[0].children[0].rotation.elements[2] += angle / 2 * dirZ;
-		Scene1.fitting.children[0].children[0].children[0].rotation.elements[2] += angle * (3 / 4) * dirZ;
+		Scene1.fitting.children[0].rotation.elements[0] += angle;
+		// Scene1.fitting.children[0].rotation.elements[0] += angle / 4 * dirX;
+		// Scene1.fitting.children[0].children[0].rotation.elements[0] += angle / 2 * dirX;
+		// Scene1.fitting.children[0].children[0].children[0].rotation.elements[0] += angle * (3 / 4) * dirX;
+		// Scene1.fitting.children[0].rotation.elements[2] += angle / 4 * dirZ;
+		// Scene1.fitting.children[0].children[0].rotation.elements[2] += angle / 2 * dirZ;
+		// Scene1.fitting.children[0].children[0].children[0].rotation.elements[2] += angle * (3 / 4) * dirZ;
 		Scene1.fitting.updateModelMatrix();
 		Scene1.fitting.updateChildren();
-
-		// Scene1.fitting.children[0].updateRot(new Vector3([angle * dirX,0,angle * dirZ]));
-
 
 		Scene1.lightPosition.elements[0] = Scene1.fitting.children[0].children[0].children[0].modelMatrix.elements[12];
 		Scene1.lightPosition.elements[1] = Scene1.fitting.children[0].children[0].children[0].modelMatrix.elements[13] - 1;
 		Scene1.lightPosition.elements[2] = Scene1.fitting.children[0].children[0].children[0].modelMatrix.elements[14];
 
-		// Scene1.lightPosition.elements[0] = 0;
-		// Scene1.lightPosition.elements[1] = 10;
-		// Scene1.lightPosition.elements[2] = 0;
 
 		if (lightTime > 9.5) {
 
@@ -1824,7 +1800,7 @@ function update (currTime) {
 			Scene1.fitting.children[0].children[0].rotation.elements[2] = 0;
 			Scene1.fitting.children[0].children[0].children[0].rotation.elements[2] = 0;
 			Scene1.fitting.updateModelMatrix();
-			Scene1.fitting.updateChildren(0.25);
+			Scene1.fitting.updateChildren();
 
 
 		}
@@ -2259,7 +2235,7 @@ function main () {	// eslint-disable-line no-unused-vars
 
 	bulb.updateRot(new Vector3([180,0,0]));
 	bulb.updateScale(new Vector3([0.6,0.6,0.6]));
-	bulb.updatePos(new Vector3([0,-1,0]));
+	bulb.updatePos(new Vector3([0,1,0]));
 	shade.updatePos(new Vector3([0,1,0]));
 
 	cable2.updatePos(new Vector3([0,-4.2,0]));
@@ -2455,7 +2431,7 @@ function main () {	// eslint-disable-line no-unused-vars
 		lightAnimation = !lightAnimation;
 		if (!lightAnimation) {
 
-			Scene1.lightScalar = 0.65;
+			Scene1.lightScalar = 0.2;
 
 		}
 		else{
