@@ -64,6 +64,6 @@
 		"mat4":"readonly",
 		"vec3":"readonly",
 		"loadShader":"readonly",
-		"getWebGLContext":"readonly "
+		"getWebGLContext":"readonly"
 	}
 }
