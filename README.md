@@ -62,7 +62,7 @@ package.json
 package-lock.json
 README.md
 Textures
-	ceramic.jpg
+	mug.png
 	fabric.jpg
 	fabricNormal.jpg
 	floor.jpg

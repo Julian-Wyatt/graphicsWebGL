@@ -227,7 +227,7 @@ app.get("/Texture/wood",function (req,res) {
 });
 app.get("/Texture/ceramic",function (req,res) {
 
-	res.sendFile(path.join(__dirname, "Textures", "ceramic.jpg"));
+	res.sendFile(path.join(__dirname, "Textures", "mug.png"));
 
 });
 app.get("/Texture/shade",function (req,res) {
