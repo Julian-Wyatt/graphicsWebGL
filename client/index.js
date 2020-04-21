@@ -50,7 +50,9 @@ void main() {
 		if(u_isLighting)
 		{
 		v_Position = vec3(u_ModelMatrix * a_Position);
-	
+		
+		// attempt at changing coordinates to tangent space from world space
+		
 		// vec3 t;
 		// vec3 b;
 		// vec3 c1 = cross(a_Normal.xyz, vec3(0.0, 0.0, 1.0));
@@ -93,6 +95,7 @@ uniform vec3 u_AmbientLight; 	// ambient light colour
 uniform bool u_UseToonShading;
 uniform bool u_UseNormalMap;
 uniform mat4 u_ModelMatrix;
+uniform mat4 u_NormalMatrix;
 uniform bool u_IsEmissive;
 uniform sampler2D u_normalTextureSampler;
 varying vec3 v_Normal;
@@ -110,21 +113,22 @@ void main() {
 
 	// Calculate the light direction and make it 1.0 in length
 
-	vec3 lightDirection;
-	// vec3 lightDirection = normalize(lightPos - v_Position);
+	vec3 lightDirection[2];
+	lightDirection[0] = normalize(u_LightPosition[0] - v_Position);
+	lightDirection[1] = normalize(u_LightPosition[1] - v_Position);
 
 	float normalDiffuse = 1.0;
 	if (u_UseNormalMap){
-		vec3 direction = normalize(vec3(1.0,-1.0,1.0));
-		vec3 normalMap = normalize(texture2D(u_normalTextureSampler, v_TexCoords).rgb * 2.0 - 1.0 );
+		vec3 direction = normalize(vec3(1.0,-1.0,0.0));
+		vec3 normalMap = (normalize(texture2D(u_normalTextureSampler, v_TexCoords).rgb * 2.0 - 1.0 ));
 		
-		normalDiffuse = 1.0+ (dot(direction,normalMap));
+		normalDiffuse = (1.0 + (dot(direction,normalMap ) * 2.0));
 	}
 
 	vec3 outputLight;
 	for (int i=0;i<2;i++){
-		lightDirection = normalize(u_LightPosition[i] - v_Position);
-		float nDotL = max(dot(lightDirection,normal),0.0);
+
+		float nDotL = max(dot(lightDirection[i],normal),0.0);
 
 		if (u_UseToonShading)
 		{
@@ -221,7 +225,7 @@ class Scene {
 		this.lightScalar = 0.2;
 		// set the light colour for flickering light
 		this.gl.uniform3f(this.program.u_LightColor, 1 * this.lightScalar, 1 * this.lightScalar, 1 * this.lightScalar);
-		this.gl.uniform3f(this.program.u_LampColor, 0.3,0.3, 0.3);
+		this.gl.uniform3f(this.program.u_LampColor, 0.25,0.25, 0.25);
 		// Calculate the view matrix and the projection matrix
 		// Multiply them and pass through to shader program - Acts as precalculation to save work on shader prorgam
 
@@ -406,6 +410,7 @@ class Scene {
 	/**
 	 * Push a new texture into the array of textures present in the Scene
 	 * @param {String} name Name of the texture
+	 * @param {Number} type Type of texture - 0 for regular - 1 for normal map - 2 for emissive (not affected by lighting)
 	 * @returns {Texture} Returns the texture instantiated
 	 */
 	newTexture (name,type) {
@@ -520,9 +525,9 @@ class Scene {
 			// w clicked
 			// move closer to the center
 			temp = this.depth + this.rate * 10;
-			if (temp > -10) {
+			if (temp > -4) {
 
-				this.depth = -10;
+				this.depth = -4;
 
 			}
 			else{
@@ -1392,6 +1397,8 @@ class Texture {
 	 * Initialises the texture Image, and the source endpoint
 	 * @param {String} name name of the texture - the endpoint on the server to get the object
 	 * @param {WebGLContext} gl The gl element in the html page
+	 * @param {Number} pointer The numerical value of the texture for look up in memory
+	 * @param {Number} type Type of texture - 0 for regular, 1 for normal map and 2 for emissive (is not affected by lighting)
 	 */
 	constructor (name,gl,pointer,type) {
 
@@ -1449,7 +1456,8 @@ class Texture {
 
 		// console.log(this.textureBuffer.img.src + "\t"+this.textureBuffer.img.height+"\t"+this.textureBuffer.img.width)
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, this.textureBuffer.img);
-		if (isPower2(this.textureBuffer.img.width) && isPower2(this.textureBuffer.img.height)) {
+
+		if (this.name != "ceramic" && isPower2(this.textureBuffer.img.width) && isPower2(this.textureBuffer.img.height)) {
 
 			gl.generateMipmap(gl.TEXTURE_2D);
 			// gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -1704,13 +1712,18 @@ let ranStartAnimation = false;
 let lightAnimation = false;
 let cushionAnimation = false;
 let chairAnimation = false;
+let mugAnimation = false;
+let mugTime = 0;
+let mugState = 0;
 let cushionTime = 0;
 let chairPosition = 1;
 let deltaFlash;
 let lightMoveAnimation = false;
 let lightTime = 0;
+let chairTime = 0;
 let dirX = 1;
 let dirZ = 1;
+
 /**
  * Runs animations and draw functions
  * @param {Number} currTime The current time elapsed when update is ran
@@ -1738,11 +1751,6 @@ function update (currTime) {
 			Scene1.walls.children[3].children[0].rotation.elements[0] += -deltaTime * 45;
 			Scene1.walls.children[3].updateModelMatrix();
 			Scene1.walls.children[3].updateChildren();
-			// Scene1.walls.children[0].children[0].updateRot(new Vector3([-deltaTime * 45,0,0]));
-			// Scene1.walls.children[1].children[0].updateRot(new Vector3([deltaTime * 45,0,0]));
-			// Scene1.walls.children[2].children[0].updateRot(new Vector3([deltaTime * 45,0,0]));
-			// Scene1.walls.children[3].children[0].updateRot(new Vector3([-deltaTime * 45,0,0]));
-
 
 			if (Scene1.walls.children[0].children[0].rotation.elements[0] > 90) {
 
@@ -1774,13 +1782,13 @@ function update (currTime) {
 		// lightTime += deltaTime;
 		lightTime += 0.016;
 		let angle = Math.cos(2 * Math.PI * lightTime) * 4 * (-(lightTime / 10 - 1) * -(lightTime / 10 - 1) * -(lightTime / 10 - 1));
-		Scene1.fitting.children[0].rotation.elements[0] += angle;
-		// Scene1.fitting.children[0].rotation.elements[0] += angle / 4 * dirX;
-		// Scene1.fitting.children[0].children[0].rotation.elements[0] += angle / 2 * dirX;
-		// Scene1.fitting.children[0].children[0].children[0].rotation.elements[0] += angle * (3 / 4) * dirX;
-		// Scene1.fitting.children[0].rotation.elements[2] += angle / 4 * dirZ;
-		// Scene1.fitting.children[0].children[0].rotation.elements[2] += angle / 2 * dirZ;
-		// Scene1.fitting.children[0].children[0].children[0].rotation.elements[2] += angle * (3 / 4) * dirZ;
+		// Scene1.fitting.children[0].rotation.elements[0] += angle;
+		Scene1.fitting.children[0].rotation.elements[0] += angle / 4 * dirX;
+		Scene1.fitting.children[0].children[0].rotation.elements[0] += angle / 2 * dirX;
+		Scene1.fitting.children[0].children[0].children[0].rotation.elements[0] += angle * (3 / 4) * dirX;
+		Scene1.fitting.children[0].rotation.elements[2] += angle / 4 * dirZ;
+		Scene1.fitting.children[0].children[0].rotation.elements[2] += angle / 2 * dirZ;
+		Scene1.fitting.children[0].children[0].children[0].rotation.elements[2] += angle * (3 / 4) * dirZ;
 		Scene1.fitting.updateModelMatrix();
 		Scene1.fitting.updateChildren();
 
@@ -1845,10 +1853,12 @@ function update (currTime) {
 		// move chair between two points
 		if (chairPosition == 2) {
 
+			chairTime += 1 / (0.99 + Math.exp(-deltaTime));
 
-			Scene1.chair.updatePos(new Vector3([0,0,deltaTime]));
+			Scene1.chair.updatePos(new Vector3([0,0,chairTime]));
 			if (Scene1.chair.position.elements[2] > -5.35) {
 
+				chairTime = 0;
 				Scene1.chair.position.elements[2] = -5.4;
 				chairPosition = 1;
 				chairAnimation = false;
@@ -1858,13 +1868,102 @@ function update (currTime) {
 		}
 		if (chairPosition == 1) {
 
-			Scene1.chair.updatePos(new Vector3([0,0,-deltaTime]));
+			chairTime -= 1 / (0.99 + Math.exp(-deltaTime));
+
+			Scene1.chair.updatePos(new Vector3([0,0,chairTime]));
 
 			if (Scene1.chair.position.elements[2] < -7.4) {
 
+				chairTime = 0;
 				Scene1.chair.position.elements[2] = -7.4;
 				chairPosition = 2;
 				chairAnimation = false;
+
+			}
+
+		}
+
+	}
+
+	if (mugAnimation) {
+		// mug animation when g or html button is pressed
+		// first moves mug uptowards invisible human, then tilts mug, waits and reverses animation.
+
+		if (mugState == 0) {
+
+			Scene1.mug.children[0].rotation.elements[2] -= deltaTime * 35;
+
+			if (Scene1.mug.children[0].rotation.elements[2] < -70) {
+
+				mugState = 1;
+
+			}
+			if (Scene1.mug.children[0].children[0].rotation.elements[1] > 85) {
+
+				Scene1.mug.children[0].children[0].rotation.elements[1] -= deltaTime * 20;
+
+			}
+
+			Scene1.mug.updateModelMatrix();
+			Scene1.mug.updateChildren();
+
+		}
+		else if (mugState == 1) {
+
+			Scene1.mug.children[0].children[0].rotation.elements[0] += deltaTime * 20;
+			Scene1.mug.children[0].position.elements[1] += deltaTime / 4;
+			Scene1.mug.updateModelMatrix();
+			Scene1.mug.updateChildren();
+
+			if (Scene1.mug.children[0].children[0].rotation.elements[0] > 30) {
+
+				mugState = 2;
+
+			}
+
+		}
+		else if (mugState == 2) {
+
+			mugTime += deltaTime;
+			if (mugTime > 1.5) {
+
+				mugState = 3;
+
+			}
+
+		}
+		else if (mugState == 3) {
+
+			Scene1.mug.children[0].children[0].rotation.elements[0] -= deltaTime * 20;
+			Scene1.mug.children[0].position.elements[1] -= deltaTime / 4;
+			Scene1.mug.updateModelMatrix();
+			Scene1.mug.updateChildren();
+
+			if (Scene1.mug.children[0].children[0].rotation.elements[0] < 0) {
+
+				mugState = 4;
+				mugTime = 0;
+
+			}
+
+		}
+
+		else{
+
+			Scene1.mug.children[0].rotation.elements[2] += deltaTime * 35;
+			if (Scene1.mug.children[0].children[0].rotation.elements[1] < 120) {
+
+				Scene1.mug.children[0].children[0].rotation.elements[1] += deltaTime * 20;
+
+			}
+			Scene1.mug.updateModelMatrix();
+			Scene1.mug.updateChildren();
+			if (Scene1.mug.children[0].rotation.elements[2] > 0) {
+
+				mugState = 0;
+				mugAnimation = false;
+				mugTime = 0;
+
 
 			}
 
@@ -1939,7 +2038,7 @@ function main () {	// eslint-disable-line no-unused-vars
 	let canvas = document.getElementById("webgl");
 	canvas.width = (glparent.offsetWidth);
 	canvas.style.width = (glparent.offsetWidth - 28) + "px";
-	canvas.height = screen.height - 280;
+	canvas.height = screen.height - 260;
 
 
 	// Get the rendering context for WebGL
@@ -1963,7 +2062,7 @@ function main () {	// eslint-disable-line no-unused-vars
 		// set new width and height of canvas
 		canvas.width = (glparent.offsetWidth);
 		canvas.style.width = (glparent.offsetWidth - 28) + "px";
-		canvas.height = window.outerHeight - 280;
+		canvas.height = window.outerHeight - 260;
 
 		// reset center of canvas
 
@@ -2057,20 +2156,32 @@ function main () {	// eslint-disable-line no-unused-vars
 
 	tableParent.updateScale(new Vector3([0.7,0.2,0.7]));
 
-	let mug = Scene1.newModel("mug",0);
-	mug.updateScale(new Vector3([0.6,0.6,0.6]));
-	mug.updatePos(new Vector3([0,-0.85,-3.5]));
 	let plate = Scene1.newModel("plate",0);
 	plate.updateScale(new Vector3([1.1,1.1,1.1]));
 	plate.updatePos(new Vector3([0.8,-0.6,0]));
+
+	let mug = Scene1.newModel("mug",0);
+	mug.updateScale(new Vector3([0.6,0.6,0.6]));
+	// mug.updateScale(new Vector3([2,2,2]));
 
 	mug.textures.push(ceramic);
 	plate.textures.push(ceramic);
 
 
+	let mugPivot1 = Scene1.newModel("mugPivot",2);
+	let mugPivot2 = Scene1.newModel("mugPivot",2);
+	mugPivot1.addChild(mugPivot2);
+	mugPivot2.addChild(mug);
+	Scene1.mug = mugPivot1;
+
 	tableParent.updateScale(new Vector3([1,1,0.85]));
 	tableParent.addChild(plate);
-	tableParent.addChild(mug);
+	tableParent.addChild(mugPivot1);
+
+	mug.updateRot(new Vector3([0,120,0]));
+	mugPivot2.updatePos(new Vector3([-5.5,2.15,0]));
+	mugPivot1.updatePos(new Vector3([5.5,-3,-1.75]));
+
 
 	// #endregion Table
 
@@ -2118,7 +2229,7 @@ function main () {	// eslint-disable-line no-unused-vars
 	Chair2Parent.updatePos(new Vector3([0,-1.3,-6]));
 	Chair2Parent.updateRot(new Vector3([0,180,0]));
 	Chair2Parent.updateScale(new Vector3([0.5,0.55,0.6]));
-	// Chair2Parent.updatePos(new Vector3([0,-1.3,5.4]));
+
 	// -5.4 to -7.5
 	// #endregion
 
@@ -2155,6 +2266,8 @@ function main () {	// eslint-disable-line no-unused-vars
 
 	cushion1.textures.push(shadeText);
 	cushion2.textures.push(shadeText);
+	cushion1.normalTexture = sofa2NormalText;
+	cushion2.normalTexture = sofa2NormalText;
 
 	let footRest = Scene1.newModel("footRest",0);
 	let footRestBase = Scene1.newModel("cube",1);
@@ -2362,16 +2475,19 @@ function main () {	// eslint-disable-line no-unused-vars
 		}
 		if (keypressed["76"]) {
 
-			// l pressed
 			// lights start to flicker - see update function
 			lightAnimation = !lightAnimation;
 			if (!lightAnimation) {
 
-				Scene1.lightScalar = 0.65;
+				dimmer.disabled = false;
+				document.getElementById("dimmerTxt").innerHTML = "Light Dimmer";
+				Scene1.lightScalar = dimmer.value;
 
 			}
 			else{
 
+				dimmer.disabled = true;
+				document.getElementById("dimmerTxt").innerHTML = "Light Dimmer (Disabled)";
 				deltaFlash = Math.random();
 				Scene1.lightScalar = Math.random() * (0.6) + 0.1;
 
@@ -2397,17 +2513,38 @@ function main () {	// eslint-disable-line no-unused-vars
 
 			// n pressed
 			// Rotate cushion animation
-			cushionAnimation = true;
+			if (!cushionAnimation) {
+
+				cushionAnimation = true;
+
+			}
+
 
 		}
 		if (keypressed["66"]) {
 
 			// b pressed
 			// Move Chair animation
-			chairAnimation = true;
+			if (!chairAnimation) {
+
+				chairAnimation = true;
+
+			}
+
 
 		}
+		if (keypressed["71"]) {
 
+
+			// g pressed
+			// mug animtion
+			if (!mugAnimation) {
+
+				mugAnimation = true;
+
+			}
+
+		}
 
 	};
 	document.onkeyup = function (ev) {
@@ -2415,6 +2552,14 @@ function main () {	// eslint-disable-line no-unused-vars
 		keypressed[ev.keyCode] = false;
 
 	};
+
+	let dimmer = document.getElementById("dimmer");
+	dimmer.value = Scene1.lightScalar;
+	dimmer.addEventListener("input", function () {
+
+		Scene1.lightScalar = this.value;
+
+	});
 
 
 	let channelButton = document.getElementById("channelBtn");
@@ -2431,11 +2576,15 @@ function main () {	// eslint-disable-line no-unused-vars
 		lightAnimation = !lightAnimation;
 		if (!lightAnimation) {
 
-			Scene1.lightScalar = 0.2;
+			dimmer.disabled = false;
+			document.getElementById("dimmerTxt").innerHTML = "Light Dimmer";
+			Scene1.lightScalar = dimmer.value;
 
 		}
 		else{
 
+			dimmer.disabled = true;
+			document.getElementById("dimmerTxt").innerHTML = "Light Dimmer (Disabled)";
 			deltaFlash = Math.random();
 			Scene1.lightScalar = Math.random() * (0.6) + 0.1;
 
@@ -2480,6 +2629,18 @@ function main () {	// eslint-disable-line no-unused-vars
 			lightMoveAnimation = true;
 			dirX = Math.random() * 2 - 1;
 			dirZ = Math.random() * 2 - 1;
+
+		}
+
+	});
+
+	let mugBtn = document.getElementById("mug");
+	mugBtn.addEventListener("click", function () {
+
+		// Move mug animation
+		if (mugAnimation == false) {
+
+			mugAnimation = true;
 
 		}
 
