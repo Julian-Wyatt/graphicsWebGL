@@ -1853,7 +1853,7 @@ function update (currTime) {
 		// move chair between two points
 		if (chairPosition == 2) {
 
-			chairTime += 1 / (0.99 + Math.exp(-deltaTime));
+			chairTime +=  deltaTime;
 
 			Scene1.chair.updatePos(new Vector3([0,0,chairTime]));
 			if (Scene1.chair.position.elements[2] > -5.35) {
@@ -1868,8 +1868,7 @@ function update (currTime) {
 		}
 		if (chairPosition == 1) {
 
-			chairTime -= 1 / (0.99 + Math.exp(-deltaTime));
-
+			chairTime -=  deltaTime;
 			Scene1.chair.updatePos(new Vector3([0,0,chairTime]));
 
 			if (Scene1.chair.position.elements[2] < -7.4) {
@@ -1886,6 +1885,7 @@ function update (currTime) {
 	}
 
 	if (mugAnimation) {
+
 		// mug animation when g or html button is pressed
 		// first moves mug uptowards invisible human, then tilts mug, waits and reverses animation.
 
