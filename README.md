@@ -4,10 +4,11 @@ Computer Graphics coursework - Year 2 Durham University
 ## Running the program
 
 Firstly, ensure node package manager is installed on your system.
+If not it can be installed here: https://nodejs.org/en/download/
 
-Then, in the current working directory, in the terminal, run npm install
+Then, in the current working directory, in the terminal, run `npm install`
 
-Then run npm start
+Then run `npm start`
 
 Page should now be available at localhost:8000
 
@@ -23,9 +24,14 @@ t - Change TV channel
 l - Make light flicker
 c - Change shader - swaps between point light and toon shading
 
-b - Make cushions spin
-n - Move chair between two points
+b - Move chair between two points
+n - Make cushions spin
 m - Make light sway
+g - drink from mug
+
+All animations have relevant html buttons
+
+HTML: switch for light flicker & dimmer for the light
 
 ## Models
 
