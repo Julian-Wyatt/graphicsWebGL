@@ -44,10 +44,11 @@ cushion,
 TV stand,
 Chair,
 Table
-plate,
-mug,
-soundbar
-Lamp shade
+Plate,
+Mug,
+Soundbar,
+Lamp shade,
+Foot rest
 
 ## Textures
 
@@ -57,7 +58,7 @@ Metal,
 Shade,
 Leather,
 Cotton/ Sofa2,
-Ceramic (plain white),
+Mug (plain white with message), white section used on other objects
 carpet,
 wallTexture,
 
@@ -116,3 +117,22 @@ client
 	index.html
 	index.js
 
+## Sources
+Textures were sourced from:
+https://www.textures.com
+https://3dtextures.me
+Miscellaneous textures sourced through https://images.google.com
+
+Models developed by myself using blender: https://www.blender.org
+
+Code adapted and developed from:
+lecture slides,
+Practical 3 - Chair.js,
+https://prideout.net/blog/old/blog/index.html@p=22.html - toon shading (from lecture slides)
+https://github.com/arthurlee/WebGLProgrammingGuideBookStudy/blob/master/official_source_code/examples/ch10/OBJViewer.js - obj importing (textbook source code)
+https://apoorvaj.io/exploring-bump-mapping-with-webgl/ - normal mapping
+https://www.geeks3d.com/20130122/normal-mapping-without-precomputed-tangent-space-vectors/	- annotated out (convert world space to tangent space)
+http://glmatrix.net - matrix library
+
+https://developer.mozilla.org/en-US/docs/Web/API/OES_standard_derivatives - normal mapping Tangent to world space within fragment
+https://github.com/sketchpunk/FunWithWebGL2/blob/master/lesson_090_normal_bump_mapping/normal_bump_frag.html - normal mapping Tangent to world space within fragment

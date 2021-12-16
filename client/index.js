@@ -1,9 +1,5 @@
 // /* eslint-disable*/
 
-// references:
-// https://github.com/arthurlee/WebGLProgrammingGuideBookStudy/blob/master/official_source_code/examples/ch10/OBJViewer.js
-// Practical 3 - Chair.js
-
 // #region shaders
 let VSHADER_SOURCE = `
 precision mediump float;
@@ -44,8 +40,7 @@ mat3 transpose(in mat3 inMatrix)
 }
 
 void main() {
-	// '  gl_Position = u_ProjMatrix * u_ViewMatrix * u_ModelMatrix * a_Position;
-	
+
 		gl_Position = u_VPMatrix * u_ModelMatrix * a_Position;
 		if(u_isLighting)
 		{
@@ -86,8 +81,10 @@ void main() {
 
 
 let FSHADER_SOURCE = `
-
 precision mediump float;
+#extension GL_EXT_shader_texture_lod : enable
+#extension GL_OES_standard_derivatives : enable
+
 uniform bool u_UseTextures;    // Texture enable/disable flag
 uniform vec3 u_LightColor[2];	// light colour
 uniform vec3 u_LightPosition[2];	// position of the light source
@@ -97,6 +94,7 @@ uniform bool u_UseNormalMap;
 uniform mat4 u_ModelMatrix;
 uniform mat4 u_NormalMatrix;
 uniform bool u_IsEmissive;
+uniform bool u_WhichNormal;
 uniform sampler2D u_normalTextureSampler;
 varying vec3 v_Normal;
 varying vec3 v_Position;
@@ -105,6 +103,20 @@ uniform sampler2D u_Sampler;
 varying vec2 v_TexCoords;
 varying vec3 ts_lightPos[2];
 varying vec3 ts_FragPosition;
+
+vec3 perturbNormal( vec3 eye_pos, vec3 surf_norm, vec2 uv_coords, sampler2D tex){
+	vec3 pNorm	= (texture2D( tex, uv_coords ).rgb * 2.0 - 1.0);
+
+	vec2 st0	= dFdx( uv_coords.st ),
+		 st1	= dFdy( uv_coords.st );
+	vec3 q0		= dFdx( eye_pos.xyz ),
+		 q1		= dFdy( eye_pos.xyz ),
+		 S		= normalize(  q0 * st1.t - q1 * st0.t ),
+		 T		= normalize( -q0 * st1.s + q1 * st0.s ),
+		 N		= normalize( surf_norm );
+
+	return normalize( mat3( S, T, N ) * pNorm );
+}
 
 void main() {
 	// Normalize normal because it's interpolated and not 1.0 (length)
@@ -119,16 +131,24 @@ void main() {
 
 	float normalDiffuse = 1.0;
 	if (u_UseNormalMap){
-		vec3 direction = normalize(vec3(1.0,-1.0,0.0));
-		vec3 normalMap = (normalize(texture2D(u_normalTextureSampler, v_TexCoords).rgb * 2.0 - 1.0 ));
-		
-		normalDiffuse = (1.0 + (dot(direction,normalMap ) * 2.0));
+
+		if (u_WhichNormal){
+			normal = perturbNormal(v_Position,normal,v_TexCoords,u_normalTextureSampler);
+		}
+		else{
+			vec3 direction = normalize(vec3(1.0,-1.0,0.0));
+			vec3 normalMap = (normalize(texture2D(u_normalTextureSampler, v_TexCoords).rgb * 2.0 - 1.0 ));
+			
+			normalDiffuse = (1.0 + (dot(direction,normalMap ) * 2.0));
+		}
 	}
 
 	vec3 outputLight;
 	for (int i=0;i<2;i++){
 
 		float nDotL = max(dot(lightDirection[i],normal),0.0);
+		
+		
 
 		if (u_UseToonShading)
 		{
@@ -310,6 +330,7 @@ class Scene {
 		this.program.u_LightPosition = this.gl.getUniformLocation(this.program, "u_LightPosition[0]");
 		this.program.u_LampPosition = this.gl.getUniformLocation(this.program, "u_LightPosition[1]");
 		this.program.u_AmbientLight = this.gl.getUniformLocation(this.program, "u_AmbientLight");
+		this.program.u_whichNormal = this.gl.getUniformLocation(this.program, "u_WhichNormal");
 
 		// Trigger using lighting or not
 		this.program.u_isLighting = this.gl.getUniformLocation(this.gl.program, "u_isLighting");
@@ -387,6 +408,7 @@ class Scene {
 		this.lightPosition = new Vector3([0,10,0]);
 		this.gl.uniform3f(this.program.u_LightPosition, this.lightPosition.elements[0],this.lightPosition.elements[1], this.lightPosition.elements[2]);
 		this.gl.uniform1i(this.program.u_isLighting, true); // Will apply lighting
+		this.gl.uniform1i(this.program.u_whichNormal, false);
 
 	}
 
@@ -2050,6 +2072,8 @@ function main () {	// eslint-disable-line no-unused-vars
 		return;
 
 	}
+	gl.getExtension("OES_standard_derivatives");
+	gl.getExtension("EXT_shader_texture_lod");
 
 	// Objects and scene graph
 	// // #region Scene Graph
@@ -2589,6 +2613,14 @@ function main () {	// eslint-disable-line no-unused-vars
 			Scene1.lightScalar = Math.random() * (0.6) + 0.1;
 
 		}
+
+	});
+
+
+	let normalBox = document.getElementById("normalBox");
+	normalBox.addEventListener("change",function () {
+
+		Scene1.gl.uniform1i(Scene1.program.u_whichNormal, normalBox.checked);
 
 	});
 
