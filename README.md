@@ -15,19 +15,20 @@ Page should now be available at localhost:8000
 ## Instructions
 
 Move around room with arrow keys
+
 Zoom in with w and out with s
+
 Please see animations below for further controls
 
 ### Animations
 
-t - Change TV channel
-l - Make light flicker
-c - Change shader - swaps between point light and toon shading
-
-b - Move chair between two points
-n - Make cushions spin
-m - Make light sway
-g - drink from mug
+* t - Change TV channel
+* l - Make light flicker
+* c - Change shader - swaps between point light and toon shading
+* b - Move chair between two points
+* n - Make cushions spin
+* m - Make light sway
+* g - drink from mug
 
 All animations have relevant html buttons
 
@@ -35,87 +36,87 @@ HTML: switch for light flicker & dimmer for the light
 
 ## Models
 
-Walls,
-Floor,
-TV,
-sofa1,
-sofa2,
-cushion,
-TV stand,
-Chair,
-Table
-Plate,
-Mug,
-Soundbar,
-Lamp shade,
-Foot rest
+* Walls,
+* Floor,
+* TV,
+* sofa1,
+* sofa2,
+* cushion,
+* TV stand,
+* Chair,
+* Table
+* Plate,
+* Mug,
+* Soundbar,
+* Lamp shade,
+* Foot rest
 
 ## Textures
 
-TV - 1,2,3,4
-Wood,
-Metal,
-Shade,
-Leather,
-Cotton/ Sofa2,
-Mug (plain white with message), white section used on other objects
-carpet,
-wallTexture,
+* TV - 1,2,3,4
+* Wood,
+* Metal,
+* Shade,
+* Leather,
+* Cotton/ Sofa2,
+* Mug (plain white with message), white section used on other objects
+* carpet,
+* wallTexture,
 
 ## Files
 
-server.js
-package.json
-package-lock.json
-README.md
-Textures
-	mug.png
-	fabric.jpg
-	fabricNormal.jpg
-	floor.jpg
-	Shade.jpg
-	skybox.png
-	sofa1.jpg
-	sofa2.jpg
-	sofa2Normal.jpg
-	TV1.png
-	TV2.png
-	TV3.png
-	TV4.png
-	wall.jpg
-	wallNormal.jpg
-	wood.png
-Models
-	bulb.obj
-	chairLeg.obj
-	chairSeat.obj
-	cushion.obj
-	footRest.obj
-	lampBase.obj
-	lampShade.obj
-	lampStand.obj
-	lampCable.obj
-	mug.obj
-	plate.obj
-	quad.obj
-	skybox.obj
-	sofa1.obj
-	sofa2.obj
-	soundbar.obj
-	table.obj
-	TV_Stand.obj
-	TV.obj
-	wall.obj
-client
-	lib
-		cuon-matrix.js
-		cuon-utils.js
-		gl-matrix.js
-		initShaders.js
-		webgl-debug.js
-		webgl-utils.js
-	index.html
-	index.js
+* server.js
+* package.json
+* package-lock.json
+* README.md
+* Textures
+	* mug.png
+	* fabric.jpg
+	* fabricNormal.jpg
+	* floor.jpg
+	* Shade.jpg
+	* skybox.png
+	* sofa1.jpg
+	* sofa2.jpg
+	* sofa2Normal.jpg
+	* TV1.png
+	* TV2.png
+	* TV3.png
+	* TV4.png
+	* wall.jpg
+	* wallNormal.jpg
+	* wood.png
+* Models
+	* bulb.obj
+	* chairLeg.obj
+	* chairSeat.obj
+	* cushion.obj
+	* footRest.obj
+	* lampBase.obj
+	* lampShade.obj
+	* lampStand.obj
+	* lampCable.obj
+	* mug.obj
+	* plate.obj
+	* quad.obj
+	* skybox.obj
+	* sofa1.obj
+	* sofa2.obj
+	* soundbar.obj
+	* table.obj
+	* TV_Stand.obj
+	* TV.obj
+	* wall.obj
+* client
+	* lib
+		* cuon-matrix.js
+		* cuon-utils.js
+		* gl-matrix.js
+		* initShaders.js
+		* webgl-debug.js
+		* webgl-utils.js
+	* index.html
+	* index.js
 
 ## Sources
 Textures were sourced from:
